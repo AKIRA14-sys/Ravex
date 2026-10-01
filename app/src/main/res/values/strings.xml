@@ -1,0 +1,7 @@
+<resources>
+    <string name="app_name">AKIRA RAVEX</string>
+    <string name="hud_service_title">RAVEX HUD Active</string>
+    <string name="hud_service_desc">Overlay and crosshair engine running</string>
+    <string name="thermal_service_title">RAVEX Thermal Guard</string>
+    <string name="thermal_service_desc">Monitoring system temperature and performance</string>
+</resources>

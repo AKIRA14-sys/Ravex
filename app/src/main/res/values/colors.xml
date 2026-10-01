@@ -1,0 +1,8 @@
+<resources>
+    <color name="ravex_black">#08080C</color>
+    <color name="ravex_surface">#10121A</color>
+    <color name="ravex_primary">#FF2A55</color>
+    <color name="ravex_cyan">#00F0FF</color>
+    <color name="ravex_gold">#FFD700</color>
+    <color name="ravex_text_white">#F0F4F8</color>
+</resources>
