@@ -12,21 +12,25 @@ import android.os.IBinder
 import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
+import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
+import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
-import androidx.compose.material3.Icon
-import androidx.compose.material3.Text
+import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
@@ -48,6 +52,7 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
+import kotlin.math.abs
 
 class RavexOverlayService : Service() {
 
@@ -105,6 +110,14 @@ class RavexOverlayService : Service() {
         val customPresets = ravexPrefs.getCustomPresets()
         val customMatch = customPresets.firstOrNull { it.id == presetId }
         activePresetState = customMatch ?: CrosshairPresetsRepository.getPresetById(presetId)
+    }
+
+    private fun updateActivePreset(newPreset: CrosshairPreset) {
+        activePresetState = newPreset
+        ravexPrefs.activeCrosshairId = newPreset.id
+        if (newPreset.isCustom) {
+            ravexPrefs.saveCustomPreset(newPreset)
+        }
     }
 
     private fun startMetricsMonitor() {
@@ -171,8 +184,8 @@ class RavexOverlayService : Service() {
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 50
-            y = 200
+            x = 80
+            y = 120
         }
 
         hudView = ComposeView(this).apply {
@@ -182,37 +195,22 @@ class RavexOverlayService : Service() {
             setContent {
                 SharinganHudBubbleComposable(
                     metrics = metricsState,
+                    activePreset = activePresetState,
                     isExpanded = isExpanded,
-                    onToggleExpand = { isExpanded = !isExpanded }
-                )
-            }
-        }
-
-        var initialX = 0
-        var initialY = 0
-        var initialTouchX = 0f
-        var initialTouchY = 0f
-
-        hudView?.setOnTouchListener { _, event ->
-            when (event.action) {
-                MotionEvent.ACTION_DOWN -> {
-                    initialX = params.x
-                    initialY = params.y
-                    initialTouchX = event.rawX
-                    initialTouchY = event.rawY
-                    true
-                }
-                MotionEvent.ACTION_MOVE -> {
-                    params.x = initialX + (event.rawX - initialTouchX).toInt()
-                    params.y = initialY + (event.rawY - initialTouchY).toInt()
-                    try {
-                        windowManager.updateViewLayout(hudView, params)
-                    } catch (e: Exception) {
-                        e.printStackTrace()
+                    onToggleExpand = { isExpanded = !isExpanded },
+                    onPresetChanged = { updatedPreset ->
+                        updateActivePreset(updatedPreset)
+                    },
+                    onDragDelta = { dx, dy ->
+                        params.x += dx.toInt()
+                        params.y += dy.toInt()
+                        try {
+                            windowManager.updateViewLayout(hudView, params)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
+                        }
                     }
-                    true
-                }
-                else -> false
+                )
             }
         }
 
@@ -265,87 +263,192 @@ class RavexOverlayService : Service() {
 @Composable
 fun SharinganHudBubbleComposable(
     metrics: SystemMetrics,
+    activePreset: CrosshairPreset?,
     isExpanded: Boolean,
-    onToggleExpand: () -> Unit
+    onToggleExpand: () -> Unit,
+    onPresetChanged: (CrosshairPreset) -> Unit,
+    onDragDelta: (Float, Float) -> Unit
 ) {
     val darkBg = Color(0xFF08080C)
     val accentCyan = Color(0xFF00F0FF)
     val accentRed = Color(0xFFE50914)
 
+    val presets = remember { CrosshairPresetsRepository.presets }
+
     if (!isExpanded) {
-        // Floating Sharingan / Wolf Bubble Icon
+        // Floating Draggable Sharingan / Wolf Bubble Icon
         Box(
             modifier = Modifier
-                .size(52.dp)
+                .size(54.dp)
                 .clip(CircleShape)
                 .background(darkBg)
                 .border(2.dp, accentRed, CircleShape)
+                .pointerInput(Unit) {
+                    detectDragGestures { change, dragAmount ->
+                        change.consume()
+                        onDragDelta(dragAmount.x, dragAmount.y)
+                    }
+                }
                 .clickable { onToggleExpand() },
             contentAlignment = Alignment.Center
         ) {
             Image(
                 painter = painterResource(id = R.drawable.ic_ravex_wolf),
-                contentDescription = "Ravex Bubble",
-                modifier = Modifier.size(36.dp)
+                contentDescription = "Ravex Floating Bubble",
+                modifier = Modifier.size(38.dp)
             )
         }
     } else {
-        // Expanded Sharingan Tactical HUD Bar
-        Row(
+        // Expanded In-Game Gaming Panel with Telemetry & Interactive In-Game Crosshair Customizer
+        Column(
             modifier = Modifier
-                .clip(RoundedCornerShape(14.dp))
-                .background(darkBg.copy(alpha = 0.95f))
-                .border(1.5.dp, accentCyan, RoundedCornerShape(14.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp)
-                .clickable { onToggleExpand() },
-            verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(14.dp)
+                .width(320.dp)
+                .clip(RoundedCornerShape(16.dp))
+                .background(darkBg.copy(alpha = 0.96f))
+                .border(1.5.dp, accentCyan, RoundedCornerShape(16.dp))
+                .padding(12.dp),
+            verticalArrangement = Arrangement.spacedBy(10.dp)
         ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_ravex_wolf),
-                contentDescription = "Collapse",
-                modifier = Modifier.size(28.dp)
-            )
+            // Header Row (Functions as drag handle for expanded panel)
+            Row(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .pointerInput(Unit) {
+                        detectDragGestures { change, dragAmount ->
+                            change.consume()
+                            onDragDelta(dragAmount.x, dragAmount.y)
+                        }
+                    },
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    Image(
+                        painter = painterResource(id = R.drawable.ic_ravex_wolf),
+                        contentDescription = "Logo",
+                        modifier = Modifier.size(22.dp)
+                    )
+                    Text("RAVEX HUD PANEL", color = accentCyan, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
+                }
 
-            Column {
-                Text(text = "FPS", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 Text(
-                    text = "${metrics.fps}",
-                    color = Color.White,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.ExtraBold
+                    text = "CLOSE [X]",
+                    color = accentRed,
+                    fontSize = 10.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onToggleExpand() }
                 )
             }
 
-            Column {
-                Text(text = "RAM", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "${metrics.ramPercentage.toInt()}%",
-                    color = if (metrics.ramPercentage > 85f) accentRed else accentCyan,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            // Real-Time Telemetry Row
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween
+            ) {
+                TelemetryMetricBox("FPS", "${metrics.fps}", Color.White)
+                TelemetryMetricBox("RAM", "${metrics.ramPercentage.toInt()}%", if (metrics.ramPercentage > 85) accentRed else accentCyan)
+                TelemetryMetricBox("TEMP", "${metrics.batteryTempC.toInt()}°C", if (metrics.batteryTempC >= 40) accentRed else Color.Green)
+                TelemetryMetricBox("PING", "${metrics.pingMs}ms", Color.Yellow)
             }
 
-            Column {
-                Text(text = "TEMP", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "${metrics.batteryTempC.toInt()}°C",
-                    color = if (metrics.batteryTempC >= 40f) accentRed else Color.Green,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
-            }
+            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            Column {
-                Text(text = "PING", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-                Text(
-                    text = "${metrics.pingMs}ms",
-                    color = Color.Yellow,
-                    fontSize = 13.sp,
-                    fontWeight = FontWeight.Bold
-                )
+            // Crosshair Quick Customizer in Bubble Panel
+            Text("IN-GAME CROSSHAIR SETTINGS", color = accentRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+
+            activePreset?.let { preset ->
+                // Preset Carousel Picker
+                Text("Select Preset:", color = Color.Gray, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    items(presets.take(15)) { p ->
+                        val isSelected = p.id == preset.id
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) accentCyan else Color(0xFF1A1D28))
+                                .clickable { onPresetChanged(p) }
+                                .padding(horizontal = 8.dp, vertical = 4.dp)
+                        ) {
+                            Text(
+                                text = p.name.take(10),
+                                color = if (isSelected) Color.Black else Color.White,
+                                fontSize = 9.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
+                }
+
+                // Size Slider
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Size: ${preset.sizeDp.toInt()}dp", color = Color.White, fontSize = 10.sp)
+                    Slider(
+                        value = preset.sizeDp,
+                        onValueChange = { newSize ->
+                            onPresetChanged(preset.copy(sizeDp = newSize, isCustom = true))
+                        },
+                        valueRange = 10f..45f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    )
+                }
+
+                // Opacity Slider (Supports 70% / 0.70 default option)
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Opacity: ${(preset.opacity * 100).toInt()}%", color = Color.White, fontSize = 10.sp)
+                    Slider(
+                        value = preset.opacity,
+                        onValueChange = { newOpacity ->
+                            onPresetChanged(preset.copy(opacity = newOpacity, isCustom = true))
+                        },
+                        valueRange = 0.2f..1.0f,
+                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                    )
+                }
+
+                // Color Picker Row
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("Color:", color = Color.White, fontSize = 10.sp)
+                    val quickColors = listOf("#FF2A55", "#00F0FF", "#39FF14", "#FFD700", "#FFFFFF", "#FF5500")
+                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        quickColors.forEach { hex ->
+                            Box(
+                                modifier = Modifier
+                                    .size(20.dp)
+                                    .clip(CircleShape)
+                                    .background(com.akira.ravex.ui.components.parseColorHex(hex))
+                                    .border(
+                                        width = if (preset.colorHex == hex) 2.dp else 0.dp,
+                                        color = Color.White,
+                                        shape = CircleShape
+                                    )
+                                    .clickable {
+                                        onPresetChanged(preset.copy(colorHex = hex, isCustom = true))
+                                    }
+                            )
+                        }
+                    }
+                }
             }
         }
+    }
+}
+
+@Composable
+fun TelemetryMetricBox(label: String, value: String, valueColor: Color) {
+    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+        Text(text = label, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
+        Text(text = value, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
     }
 }

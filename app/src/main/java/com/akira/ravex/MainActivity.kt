@@ -13,6 +13,7 @@ import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.Info
 import androidx.compose.material.icons.filled.Lock
+import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material.icons.filled.Star
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -27,13 +28,13 @@ import com.akira.ravex.ui.screens.*
 import com.akira.ravex.ui.theme.*
 import com.akira.ravex.util.RavexGuard
 
-enum class NavigationTab(val label: String, val icon: ImageVector) {
-    GAMEFORGE("GameForge", Icons.Default.Home),
-    CROSSHAIR("Crosshairs", Icons.Default.Build),
-    HEALTH("Health", Icons.Default.Info),
-    THERMAL("Thermal", Icons.Default.Lock),
-    NETWORK("Network", Icons.Default.Star),
-    GUARD("Guard", Icons.Default.Info)
+enum class SharinganNavigationTab(val label: String, val icon: ImageVector) {
+    GAMEFORGE("GAMEFORGE", Icons.Default.Home),
+    PERFORMANCE("PERFORMANCE", Icons.Default.Info),
+    GAMES("GAMES", Icons.Default.Build),
+    HUD("HUD", Icons.Default.Lock),
+    NETWORK("NETWORK", Icons.Default.Star),
+    SETTINGS("SETTINGS", Icons.Default.Settings)
 }
 
 class MainActivity : ComponentActivity() {
@@ -63,24 +64,24 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppScaffold(ravexPrefs: RavexPreferences) {
-    var selectedTab by remember { mutableStateOf(NavigationTab.GAMEFORGE) }
+    var selectedTab by remember { mutableStateOf(SharinganNavigationTab.GAMEFORGE) }
 
     Scaffold(
         bottomBar = {
             NavigationBar(
                 containerColor = RavexSurface,
                 tonalElevation = 8.dp,
-                modifier = Modifier.height(48.dp)
+                modifier = Modifier.height(44.dp)
             ) {
-                NavigationTab.values().forEach { tab ->
+                SharinganNavigationTab.values().forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label, modifier = Modifier.size(18.dp)) },
-                        label = { Text(tab.label, fontSize = 9.sp) },
+                        icon = { Icon(tab.icon, contentDescription = tab.label, modifier = Modifier.size(16.dp)) },
+                        label = { Text(tab.label, fontSize = 8.5.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
                         colors = NavigationBarItemDefaults.colors(
-                            selectedIconColor = RavexRed,
-                            selectedTextColor = RavexRed,
+                            selectedIconColor = RavexCyan,
+                            selectedTextColor = RavexCyan,
                             indicatorColor = RavexSurfaceVariant,
                             unselectedIconColor = RavexTextMuted,
                             unselectedTextColor = RavexTextMuted
@@ -97,21 +98,21 @@ fun MainAppScaffold(ravexPrefs: RavexPreferences) {
                 .background(RavexBlack)
         ) {
             when (selectedTab) {
-                NavigationTab.GAMEFORGE -> GameForgeLandscapeScreen(
+                SharinganNavigationTab.GAMEFORGE -> GameForgeLandscapeScreen(
                     ravexPrefs = ravexPrefs,
                     onNavigateTab = { tabName ->
                         when (tabName) {
-                            "CROSSHAIR" -> selectedTab = NavigationTab.CROSSHAIR
-                            "HEALTH" -> selectedTab = NavigationTab.HEALTH
-                            "THERMAL" -> selectedTab = NavigationTab.THERMAL
+                            "GAMES" -> selectedTab = SharinganNavigationTab.GAMES
+                            "PERFORMANCE" -> selectedTab = SharinganNavigationTab.PERFORMANCE
+                            "HUD" -> selectedTab = SharinganNavigationTab.HUD
                         }
                     }
                 )
-                NavigationTab.CROSSHAIR -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
-                NavigationTab.HEALTH -> PhoneHealthLandscapeScreen()
-                NavigationTab.THERMAL -> ThermalGuardScreen(ravexPrefs = ravexPrefs)
-                NavigationTab.NETWORK -> RavexNetworkScreen()
-                NavigationTab.GUARD -> RavexGuardScreen()
+                SharinganNavigationTab.PERFORMANCE -> PhoneHealthLandscapeScreen()
+                SharinganNavigationTab.GAMES -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.HUD -> ThermalGuardScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.NETWORK -> RavexNetworkScreen()
+                SharinganNavigationTab.SETTINGS -> RavexGuardScreen()
             }
         }
     }
