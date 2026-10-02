@@ -11,8 +11,6 @@ import android.os.Build
 import android.os.IBinder
 import android.provider.Settings
 import android.view.Gravity
-import android.view.MotionEvent
-import android.view.View
 import android.view.WindowManager
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -67,7 +65,6 @@ class RavexOverlayService : Service() {
     private var activePresetState by mutableStateOf<CrosshairPreset?>(null)
     private var isExpanded by mutableStateOf(false)
     private var isCrosshairEnabledState by mutableStateOf(true)
-    private var isHudEnabledState by mutableStateOf(true)
 
     private var monitorJob: Job? = null
 
@@ -87,7 +84,6 @@ class RavexOverlayService : Service() {
         lifecycleOwner.onResume()
 
         isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
-        isHudEnabledState = ravexPrefs.isHudEnabled
 
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification())
@@ -103,7 +99,6 @@ class RavexOverlayService : Service() {
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
-        isHudEnabledState = ravexPrefs.isHudEnabled
         when (intent?.action) {
             ACTION_STOP_HUD -> stopSelf()
             ACTION_REFRESH_CROSSHAIR -> refreshActivePreset()
@@ -113,7 +108,6 @@ class RavexOverlayService : Service() {
 
     private fun refreshActivePreset() {
         isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
-        isHudEnabledState = ravexPrefs.isHudEnabled
         val presetId = ravexPrefs.activeCrosshairId
         val customPresets = ravexPrefs.getCustomPresets()
         val customMatch = customPresets.firstOrNull { it.id == presetId }
@@ -201,36 +195,29 @@ class RavexOverlayService : Service() {
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                if (isHudEnabledState) {
-                    SharinganHudBubbleComposable(
-                        metrics = metricsState,
-                        activePreset = activePresetState,
-                        isExpanded = isExpanded,
-                        isCrosshairEnabled = isCrosshairEnabledState,
-                        isHudEnabled = isHudEnabledState,
-                        onToggleExpand = { isExpanded = !isExpanded },
-                        onToggleCrosshair = { enabled ->
-                            isCrosshairEnabledState = enabled
-                            ravexPrefs.isCrosshairEnabled = enabled
-                        },
-                        onToggleHudPanel = { enabled ->
-                            isHudEnabledState = enabled
-                            ravexPrefs.isHudEnabled = enabled
-                        },
-                        onPresetChanged = { updatedPreset ->
-                            updateActivePreset(updatedPreset)
-                        },
-                        onDragDelta = { dx, dy ->
-                            params.x += dx.toInt()
-                            params.y += dy.toInt()
-                            try {
-                                windowManager.updateViewLayout(hudView, params)
-                            } catch (e: Exception) {
-                                e.printStackTrace()
-                            }
+                SharinganHudBubbleComposable(
+                    metrics = metricsState,
+                    activePreset = activePresetState,
+                    isExpanded = isExpanded,
+                    isCrosshairEnabled = isCrosshairEnabledState,
+                    onToggleExpand = { isExpanded = !isExpanded },
+                    onToggleCrosshair = { enabled ->
+                        isCrosshairEnabledState = enabled
+                        ravexPrefs.isCrosshairEnabled = enabled
+                    },
+                    onPresetChanged = { updatedPreset ->
+                        updateActivePreset(updatedPreset)
+                    },
+                    onDragDelta = { dx, dy ->
+                        params.x += dx.toInt()
+                        params.y += dy.toInt()
+                        try {
+                            windowManager.updateViewLayout(hudView, params)
+                        } catch (e: Exception) {
+                            e.printStackTrace()
                         }
-                    )
-                }
+                    }
+                )
             }
         }
 
@@ -286,10 +273,8 @@ fun SharinganHudBubbleComposable(
     activePreset: CrosshairPreset?,
     isExpanded: Boolean,
     isCrosshairEnabled: Boolean,
-    isHudEnabled: Boolean,
     onToggleExpand: () -> Unit,
     onToggleCrosshair: (Boolean) -> Unit,
-    onToggleHudPanel: (Boolean) -> Unit,
     onPresetChanged: (CrosshairPreset) -> Unit,
     onDragDelta: (Float, Float) -> Unit
 ) {
@@ -303,10 +288,10 @@ fun SharinganHudBubbleComposable(
         // Floating Draggable Sharingan / Wolf Bubble Icon
         Box(
             modifier = Modifier
-                .size(54.dp)
+                .size(56.dp)
                 .clip(CircleShape)
                 .background(darkBg)
-                .border(2.dp, accentRed, CircleShape)
+                .border(2.5.dp, accentRed, CircleShape)
                 .pointerInput(Unit) {
                     detectDragGestures { change, dragAmount ->
                         change.consume()
@@ -319,7 +304,7 @@ fun SharinganHudBubbleComposable(
             Image(
                 painter = painterResource(id = R.drawable.ic_ravex_wolf),
                 contentDescription = "Ravex Floating Bubble",
-                modifier = Modifier.size(38.dp)
+                modifier = Modifier.size(40.dp)
             )
         }
     } else {
@@ -356,7 +341,7 @@ fun SharinganHudBubbleComposable(
                 }
 
                 Text(
-                    text = "CLOSE [X]",
+                    text = "COLLAPSE [X]",
                     color = accentRed,
                     fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
@@ -377,33 +362,18 @@ fun SharinganHudBubbleComposable(
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
-            // Master Feature Switches directly in Floating HUD Panel
-            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("CROSSHAIR OVERLAY", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                    Switch(
-                        checked = isCrosshairEnabled,
-                        onCheckedChange = onToggleCrosshair,
-                        modifier = Modifier.height(24.dp)
-                    )
-                }
-
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("FLOATING HUD PANEL", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                    Switch(
-                        checked = isHudEnabled,
-                        onCheckedChange = onToggleHudPanel,
-                        modifier = Modifier.height(24.dp)
-                    )
-                }
+            // Crosshair Toggle Switch inside Floating HUD Panel
+            Row(
+                modifier = Modifier.fillMaxWidth(),
+                horizontalArrangement = Arrangement.SpaceBetween,
+                verticalAlignment = Alignment.CenterVertically
+            ) {
+                Text("CROSSHAIR OVERLAY", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                Switch(
+                    checked = isCrosshairEnabled,
+                    onCheckedChange = onToggleCrosshair,
+                    modifier = Modifier.height(24.dp)
+                )
             }
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
@@ -452,7 +422,7 @@ fun SharinganHudBubbleComposable(
                         )
                     }
 
-                    // Opacity Slider (Supports 70% / 0.70 default option)
+                    // Opacity Slider
                     Row(
                         modifier = Modifier.fillMaxWidth(),
                         horizontalArrangement = Arrangement.SpaceBetween,

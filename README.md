@@ -2,7 +2,7 @@
 
 ![AKIRA RAVEX Sharingan Reference](app/src/main/res/drawable/ravex_sharingan_ref.jpg)
 
-**AKIRA RAVEX** is a high-performance native Android mobile gaming companion app and HUD platform built in **Kotlin** with **Jetpack Compose**. It reproduces the crimson **Sharingan UI** gaming interface in **Landscape Orientation**, featuring a live hardware telemetry header, 200+ preset visual crosshair engine, draggable floating RAVEX HUD bubble overlay with master feature switches and in-game crosshair controls, game-targeted crosshair assignment, Game Mode performance switcher, Thermal Guard monitoring, and local crash diagnostics (**RavexGuard**).
+**AKIRA RAVEX** is a high-performance native Android mobile gaming companion app and HUD platform built in **Kotlin** with **Jetpack Compose**. It reproduces the crimson **Sharingan UI** gaming interface in **Landscape Orientation**, featuring a live hardware telemetry header, 200+ preset visual crosshair engine, draggable persistent floating RAVEX HUD bubble overlay with master feature switches and in-game crosshair controls, game-targeted crosshair assignment, Thermal Guard monitoring, and local crash diagnostics (**RavexGuard**).
 
 ---
 
@@ -13,10 +13,13 @@
    - Features animated rotating 3-tomoe Sharingan Eye centerpiece, unobscured PLAY button directly underneath, tech panels, and glowing crimson telemetry bar.
    - **Sharingan Navigation Bar**: `[GAMEFORGE] [PERFORMANCE] [GAMES] [HUD] [NETWORK] [SETTINGS]`.
 
-2. **Master Toggles (In-App & Floating HUD Panel)**:
-   - Independent ON/OFF master switches for **CROSSHAIR OVERLAY** and **FLOATING HUD PANEL** directly within the app dashboard and inside the floating HUD panel.
+2. **Persistent Draggable Floating HUD Bubble & In-Game Controls**:
+   - Smoothly draggable floating Sharingan/Wolf bubble window using Android `SYSTEM_ALERT_WINDOW` (`Settings.canDrawOverlays`).
+   - Tap-to-expand HUD panel providing real-time FPS, RAM %, temperature, and ping.
+   - **Master Toggles & Quick Customizer**: Toggle crosshair overlay ON/OFF, change crosshair presets, adjust size, opacity (70%+), and quick color choices directly from the floating HUD panel while playing games.
+   - Collapse returns cleanly to the floating draggable bubble badge.
 
-3. **GAMEFORGE Real Game Carousel, Game Modes & Targeted Crosshair**:
+3. **GAMEFORGE Real Game Carousel & Targeted Crosshair**:
    - **Real Games Only**: Scans and displays installed Android applications using system `PackageManager`.
    - Uses real application icons and labels.
    - **Game Mode Switcher**: Instantly toggle between `BALANCED`, `PERFORMANCE`, and `ULTRA` gaming profiles.
@@ -27,20 +30,15 @@
    - **Studio Customizer**: Custom shapes (Cross, Dot, Circle Cross, Chevron, T-Shape, Diamond, etc.), size, stroke, gap, opacity, center dot, rotation, and animated pulse.
    - Strictly a visual customizer HUD (no aimbot, auto-aim, or game code modification).
 
-5. **Floating RAVEX HUD Bubble Overlay with In-Game Controls**:
-   - Smoothly draggable floating Sharingan/Wolf bubble window using Android `SYSTEM_ALERT_WINDOW` (`Settings.canDrawOverlays`).
-   - Tap-to-expand HUD panel providing real-time FPS, RAM %, temperature, and ping.
-   - **In-Game Crosshair Quick Settings**: Change crosshair presets, adjust size, opacity (70%+), and quick color choices directly from the floating HUD panel while playing games.
-
-6. **Phone Health & Hardware Safety**:
+5. **Phone Health & Hardware Safety**:
    - Pure telemetry readout system for RAM, display refresh rate, battery temperature, battery voltage, and thermal state.
    - **Hardware Safety**: Does NOT overclock, undervolt, modify kernel settings, or tamper with device hardware.
 
-7. **Thermal Guard & Network Boost**:
+6. **Thermal Guard & Network Boost**:
    - Multi-stage temperature warnings (Normal <36°C, Warm 36-42°C, Overheat >42°C) with background notifications.
    - Network latency monitoring and ping stabilization.
 
-8. **RavexGuard Diagnostics**:
+7. **RavexGuard Diagnostics**:
    - Local uncaught exception handler for logging local crash diagnostics.
 
 ---
