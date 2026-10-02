@@ -52,7 +52,6 @@ import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
-import kotlin.math.abs
 
 class RavexOverlayService : Service() {
 
@@ -67,6 +66,8 @@ class RavexOverlayService : Service() {
     private var metricsState by mutableStateOf(SystemMetrics())
     private var activePresetState by mutableStateOf<CrosshairPreset?>(null)
     private var isExpanded by mutableStateOf(false)
+    private var isCrosshairEnabledState by mutableStateOf(true)
+    private var isHudEnabledState by mutableStateOf(true)
 
     private var monitorJob: Job? = null
 
@@ -85,6 +86,9 @@ class RavexOverlayService : Service() {
         lifecycleOwner.onStart()
         lifecycleOwner.onResume()
 
+        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
+        isHudEnabledState = ravexPrefs.isHudEnabled
+
         createNotificationChannel()
         startForeground(NOTIF_ID, buildNotification())
 
@@ -98,6 +102,8 @@ class RavexOverlayService : Service() {
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
+        isHudEnabledState = ravexPrefs.isHudEnabled
         when (intent?.action) {
             ACTION_STOP_HUD -> stopSelf()
             ACTION_REFRESH_CROSSHAIR -> refreshActivePreset()
@@ -106,6 +112,8 @@ class RavexOverlayService : Service() {
     }
 
     private fun refreshActivePreset() {
+        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
+        isHudEnabledState = ravexPrefs.isHudEnabled
         val presetId = ravexPrefs.activeCrosshairId
         val customPresets = ravexPrefs.getCustomPresets()
         val customMatch = customPresets.firstOrNull { it.id == presetId }
@@ -155,7 +163,7 @@ class RavexOverlayService : Service() {
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
                 val preset = activePresetState
-                if (preset != null) {
+                if (isCrosshairEnabledState && preset != null) {
                     CrosshairCanvas(preset = preset)
                 }
             }
@@ -193,24 +201,36 @@ class RavexOverlayService : Service() {
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                SharinganHudBubbleComposable(
-                    metrics = metricsState,
-                    activePreset = activePresetState,
-                    isExpanded = isExpanded,
-                    onToggleExpand = { isExpanded = !isExpanded },
-                    onPresetChanged = { updatedPreset ->
-                        updateActivePreset(updatedPreset)
-                    },
-                    onDragDelta = { dx, dy ->
-                        params.x += dx.toInt()
-                        params.y += dy.toInt()
-                        try {
-                            windowManager.updateViewLayout(hudView, params)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                if (isHudEnabledState) {
+                    SharinganHudBubbleComposable(
+                        metrics = metricsState,
+                        activePreset = activePresetState,
+                        isExpanded = isExpanded,
+                        isCrosshairEnabled = isCrosshairEnabledState,
+                        isHudEnabled = isHudEnabledState,
+                        onToggleExpand = { isExpanded = !isExpanded },
+                        onToggleCrosshair = { enabled ->
+                            isCrosshairEnabledState = enabled
+                            ravexPrefs.isCrosshairEnabled = enabled
+                        },
+                        onToggleHudPanel = { enabled ->
+                            isHudEnabledState = enabled
+                            ravexPrefs.isHudEnabled = enabled
+                        },
+                        onPresetChanged = { updatedPreset ->
+                            updateActivePreset(updatedPreset)
+                        },
+                        onDragDelta = { dx, dy ->
+                            params.x += dx.toInt()
+                            params.y += dy.toInt()
+                            try {
+                                windowManager.updateViewLayout(hudView, params)
+                            } catch (e: Exception) {
+                                e.printStackTrace()
+                            }
                         }
-                    }
-                )
+                    )
+                }
             }
         }
 
@@ -265,7 +285,11 @@ fun SharinganHudBubbleComposable(
     metrics: SystemMetrics,
     activePreset: CrosshairPreset?,
     isExpanded: Boolean,
+    isCrosshairEnabled: Boolean,
+    isHudEnabled: Boolean,
     onToggleExpand: () -> Unit,
+    onToggleCrosshair: (Boolean) -> Unit,
+    onToggleHudPanel: (Boolean) -> Unit,
     onPresetChanged: (CrosshairPreset) -> Unit,
     onDragDelta: (Float, Float) -> Unit
 ) {
@@ -299,7 +323,7 @@ fun SharinganHudBubbleComposable(
             )
         }
     } else {
-        // Expanded In-Game Gaming Panel with Telemetry & Interactive In-Game Crosshair Customizer
+        // Expanded In-Game Gaming Panel with Master Switches, Telemetry & Interactive In-Game Crosshair Customizer
         Column(
             modifier = Modifier
                 .width(320.dp)
@@ -353,90 +377,123 @@ fun SharinganHudBubbleComposable(
 
             HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
 
+            // Master Feature Switches directly in Floating HUD Panel
+            Column(verticalArrangement = Arrangement.spacedBy(4.dp)) {
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("CROSSHAIR OVERLAY", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Switch(
+                        checked = isCrosshairEnabled,
+                        onCheckedChange = onToggleCrosshair,
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+
+                Row(
+                    modifier = Modifier.fillMaxWidth(),
+                    horizontalArrangement = Arrangement.SpaceBetween,
+                    verticalAlignment = Alignment.CenterVertically
+                ) {
+                    Text("FLOATING HUD PANEL", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
+                    Switch(
+                        checked = isHudEnabled,
+                        onCheckedChange = onToggleHudPanel,
+                        modifier = Modifier.height(24.dp)
+                    )
+                }
+            }
+
+            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
+
             // Crosshair Quick Customizer in Bubble Panel
-            Text("IN-GAME CROSSHAIR SETTINGS", color = accentRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
+            if (isCrosshairEnabled) {
+                Text("IN-GAME CROSSHAIR SETTINGS", color = accentRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
 
-            activePreset?.let { preset ->
-                // Preset Carousel Picker
-                Text("Select Preset:", color = Color.Gray, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    items(presets.take(15)) { p ->
-                        val isSelected = p.id == preset.id
-                        Box(
-                            modifier = Modifier
-                                .clip(RoundedCornerShape(6.dp))
-                                .background(if (isSelected) accentCyan else Color(0xFF1A1D28))
-                                .clickable { onPresetChanged(p) }
-                                .padding(horizontal = 8.dp, vertical = 4.dp)
-                        ) {
-                            Text(
-                                text = p.name.take(10),
-                                color = if (isSelected) Color.Black else Color.White,
-                                fontSize = 9.sp,
-                                fontWeight = FontWeight.Bold
-                            )
-                        }
-                    }
-                }
-
-                // Size Slider
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Size: ${preset.sizeDp.toInt()}dp", color = Color.White, fontSize = 10.sp)
-                    Slider(
-                        value = preset.sizeDp,
-                        onValueChange = { newSize ->
-                            onPresetChanged(preset.copy(sizeDp = newSize, isCustom = true))
-                        },
-                        valueRange = 10f..45f,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                    )
-                }
-
-                // Opacity Slider (Supports 70% / 0.70 default option)
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Opacity: ${(preset.opacity * 100).toInt()}%", color = Color.White, fontSize = 10.sp)
-                    Slider(
-                        value = preset.opacity,
-                        onValueChange = { newOpacity ->
-                            onPresetChanged(preset.copy(opacity = newOpacity, isCustom = true))
-                        },
-                        valueRange = 0.2f..1.0f,
-                        modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                    )
-                }
-
-                // Color Picker Row
-                Row(
-                    modifier = Modifier.fillMaxWidth(),
-                    horizontalArrangement = Arrangement.SpaceBetween,
-                    verticalAlignment = Alignment.CenterVertically
-                ) {
-                    Text("Color:", color = Color.White, fontSize = 10.sp)
-                    val quickColors = listOf("#FF2A55", "#00F0FF", "#39FF14", "#FFD700", "#FFFFFF", "#FF5500")
-                    Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        quickColors.forEach { hex ->
+                activePreset?.let { preset ->
+                    // Preset Carousel Picker
+                    Text("Select Preset:", color = Color.Gray, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
+                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                        items(presets.take(15)) { p ->
+                            val isSelected = p.id == preset.id
                             Box(
                                 modifier = Modifier
-                                    .size(20.dp)
-                                    .clip(CircleShape)
-                                    .background(com.akira.ravex.ui.components.parseColorHex(hex))
-                                    .border(
-                                        width = if (preset.colorHex == hex) 2.dp else 0.dp,
-                                        color = Color.White,
-                                        shape = CircleShape
-                                    )
-                                    .clickable {
-                                        onPresetChanged(preset.copy(colorHex = hex, isCustom = true))
-                                    }
-                            )
+                                    .clip(RoundedCornerShape(6.dp))
+                                    .background(if (isSelected) accentCyan else Color(0xFF1A1D28))
+                                    .clickable { onPresetChanged(p) }
+                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                            ) {
+                                Text(
+                                    text = p.name.take(10),
+                                    color = if (isSelected) Color.Black else Color.White,
+                                    fontSize = 9.sp,
+                                    fontWeight = FontWeight.Bold
+                                )
+                            }
+                        }
+                    }
+
+                    // Size Slider
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Size: ${preset.sizeDp.toInt()}dp", color = Color.White, fontSize = 10.sp)
+                        Slider(
+                            value = preset.sizeDp,
+                            onValueChange = { newSize ->
+                                onPresetChanged(preset.copy(sizeDp = newSize, isCustom = true))
+                            },
+                            valueRange = 10f..45f,
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                    }
+
+                    // Opacity Slider (Supports 70% / 0.70 default option)
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Opacity: ${(preset.opacity * 100).toInt()}%", color = Color.White, fontSize = 10.sp)
+                        Slider(
+                            value = preset.opacity,
+                            onValueChange = { newOpacity ->
+                                onPresetChanged(preset.copy(opacity = newOpacity, isCustom = true))
+                            },
+                            valueRange = 0.2f..1.0f,
+                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
+                        )
+                    }
+
+                    // Color Picker Row
+                    Row(
+                        modifier = Modifier.fillMaxWidth(),
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+                        Text("Color:", color = Color.White, fontSize = 10.sp)
+                        val quickColors = listOf("#FF2A55", "#00F0FF", "#39FF14", "#FFD700", "#FFFFFF", "#FF5500")
+                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                            quickColors.forEach { hex ->
+                                Box(
+                                    modifier = Modifier
+                                        .size(20.dp)
+                                        .clip(CircleShape)
+                                        .background(com.akira.ravex.ui.components.parseColorHex(hex))
+                                        .border(
+                                            width = if (preset.colorHex == hex) 2.dp else 0.dp,
+                                            color = Color.White,
+                                            shape = CircleShape
+                                        )
+                                        .clickable {
+                                            onPresetChanged(preset.copy(colorHex = hex, isCustom = true))
+                                        }
+                                )
+                            }
                         }
                     }
                 }

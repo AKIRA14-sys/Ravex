@@ -15,8 +15,10 @@ class RavexPreferences(context: Context) {
     companion object {
         private const val KEY_ACTIVE_CROSSHAIR_ID = "active_crosshair_id"
         private const val KEY_HUD_ENABLED = "hud_enabled"
+        private const val KEY_CROSSHAIR_ENABLED = "crosshair_enabled"
         private const val KEY_THERMAL_GUARD_ENABLED = "thermal_guard_enabled"
         private const val KEY_FPS_ENABLED = "fps_enabled"
+        private const val KEY_GAME_MODE = "game_mode" // BALANCED, PERFORMANCE, ULTRA
         private const val KEY_GAME_PROFILES_JSON = "game_profiles_json"
         private const val KEY_CUSTOM_PRESETS_JSON = "custom_presets_json"
     }
@@ -26,8 +28,12 @@ class RavexPreferences(context: Context) {
         set(value) = prefs.edit().putString(KEY_ACTIVE_CROSSHAIR_ID, value).apply()
 
     var isHudEnabled: Boolean
-        get() = prefs.getBoolean(KEY_HUD_ENABLED, false)
+        get() = prefs.getBoolean(KEY_HUD_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_HUD_ENABLED, value).apply()
+
+    var isCrosshairEnabled: Boolean
+        get() = prefs.getBoolean(KEY_CROSSHAIR_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_CROSSHAIR_ENABLED, value).apply()
 
     var isThermalGuardEnabled: Boolean
         get() = prefs.getBoolean(KEY_THERMAL_GUARD_ENABLED, true)
@@ -36,6 +42,10 @@ class RavexPreferences(context: Context) {
     var isFpsEnabled: Boolean
         get() = prefs.getBoolean(KEY_FPS_ENABLED, true)
         set(value) = prefs.edit().putBoolean(KEY_FPS_ENABLED, value).apply()
+
+    var gameMode: String
+        get() = prefs.getString(KEY_GAME_MODE, "PERFORMANCE") ?: "PERFORMANCE"
+        set(value) = prefs.edit().putString(KEY_GAME_MODE, value).apply()
 
     fun getGameProfiles(): Map<String, GameProfile> {
         val jsonStr = prefs.getString(KEY_GAME_PROFILES_JSON, null) ?: return emptyMap()
