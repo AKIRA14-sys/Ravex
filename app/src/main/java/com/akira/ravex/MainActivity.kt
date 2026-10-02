@@ -28,8 +28,9 @@ import com.akira.ravex.ui.theme.*
 import com.akira.ravex.util.RavexGuard
 
 enum class NavigationTab(val label: String, val icon: ImageVector) {
-    DASHBOARD("GameForge", Icons.Default.Home),
+    GAMEFORGE("GameForge", Icons.Default.Home),
     CROSSHAIR("Crosshairs", Icons.Default.Build),
+    HEALTH("Health", Icons.Default.Info),
     THERMAL("Thermal", Icons.Default.Lock),
     NETWORK("Network", Icons.Default.Star),
     GUARD("Guard", Icons.Default.Info)
@@ -44,12 +45,10 @@ class MainActivity : ComponentActivity() {
         RavexGuard.init(this)
         ravexPrefs = RavexPreferences(this)
 
-        // Start background thermal guard if enabled
         if (ravexPrefs.isThermalGuardEnabled) {
             startService(Intent(this, ThermalGuardService::class.java))
         }
 
-        // Start overlay service if HUD enabled & overlay permission granted
         if (ravexPrefs.isHudEnabled && Settings.canDrawOverlays(this)) {
             startService(Intent(this, RavexOverlayService::class.java))
         }
@@ -64,20 +63,21 @@ class MainActivity : ComponentActivity() {
 
 @Composable
 fun MainAppScaffold(ravexPrefs: RavexPreferences) {
-    var selectedTab by remember { mutableStateOf(NavigationTab.DASHBOARD) }
+    var selectedTab by remember { mutableStateOf(NavigationTab.GAMEFORGE) }
 
     Scaffold(
         bottomBar = {
             NavigationBar(
                 containerColor = RavexSurface,
-                tonalElevation = 8.dp
+                tonalElevation = 8.dp,
+                modifier = Modifier.height(48.dp)
             ) {
                 NavigationTab.values().forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label) },
-                        label = { Text(tab.label, fontSize = 10.sp) },
+                        icon = { Icon(tab.icon, contentDescription = tab.label, modifier = Modifier.size(18.dp)) },
+                        label = { Text(tab.label, fontSize = 9.sp) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = RavexRed,
                             selectedTextColor = RavexRed,
@@ -97,12 +97,18 @@ fun MainAppScaffold(ravexPrefs: RavexPreferences) {
                 .background(RavexBlack)
         ) {
             when (selectedTab) {
-                NavigationTab.DASHBOARD -> DashboardScreen(
+                NavigationTab.GAMEFORGE -> GameForgeLandscapeScreen(
                     ravexPrefs = ravexPrefs,
-                    onNavigateToCrosshairs = { selectedTab = NavigationTab.CROSSHAIR },
-                    onNavigateToThermalGuard = { selectedTab = NavigationTab.THERMAL }
+                    onNavigateTab = { tabName ->
+                        when (tabName) {
+                            "CROSSHAIR" -> selectedTab = NavigationTab.CROSSHAIR
+                            "HEALTH" -> selectedTab = NavigationTab.HEALTH
+                            "THERMAL" -> selectedTab = NavigationTab.THERMAL
+                        }
+                    }
                 )
                 NavigationTab.CROSSHAIR -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
+                NavigationTab.HEALTH -> PhoneHealthLandscapeScreen()
                 NavigationTab.THERMAL -> ThermalGuardScreen(ravexPrefs = ravexPrefs)
                 NavigationTab.NETWORK -> RavexNetworkScreen()
                 NavigationTab.GUARD -> RavexGuardScreen()
