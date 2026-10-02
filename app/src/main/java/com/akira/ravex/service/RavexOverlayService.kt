@@ -13,6 +13,7 @@ import android.provider.Settings
 import android.view.Gravity
 import android.view.MotionEvent
 import android.view.WindowManager
+import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -60,7 +61,7 @@ class RavexOverlayService : Service() {
 
     private var metricsState by mutableStateOf(SystemMetrics())
     private var activePresetState by mutableStateOf<CrosshairPreset?>(null)
-    private var isExpanded by mutableStateOf(true)
+    private var isExpanded by mutableStateOf(false)
 
     private var monitorJob: Job? = null
 
@@ -179,7 +180,7 @@ class RavexOverlayService : Service() {
             setViewTreeViewModelStoreOwner(lifecycleOwner)
             setViewTreeSavedStateRegistryOwner(lifecycleOwner)
             setContent {
-                HudOverlayComposable(
+                SharinganHudBubbleComposable(
                     metrics = metricsState,
                     isExpanded = isExpanded,
                     onToggleExpand = { isExpanded = !isExpanded }
@@ -187,7 +188,6 @@ class RavexOverlayService : Service() {
             }
         }
 
-        // Drag listener for HUD Widget
         var initialX = 0
         var initialY = 0
         var initialTouchX = 0f
@@ -263,91 +263,86 @@ class RavexOverlayService : Service() {
 }
 
 @Composable
-fun HudOverlayComposable(
+fun SharinganHudBubbleComposable(
     metrics: SystemMetrics,
     isExpanded: Boolean,
     onToggleExpand: () -> Unit
 ) {
-    val darkBg = Color(0xFF10121A)
+    val darkBg = Color(0xFF08080C)
     val accentCyan = Color(0xFF00F0FF)
-    val accentRed = Color(0xFFFF2A55)
+    val accentRed = Color(0xFFE50914)
 
     if (!isExpanded) {
-        // Compact Wolf Badge
+        // Floating Sharingan / Wolf Bubble Icon
         Box(
             modifier = Modifier
-                .size(48.dp)
+                .size(52.dp)
                 .clip(CircleShape)
                 .background(darkBg)
-                .border(2.dp, accentCyan, CircleShape)
+                .border(2.dp, accentRed, CircleShape)
                 .clickable { onToggleExpand() },
             contentAlignment = Alignment.Center
         ) {
-            Text(
-                text = "RX",
-                color = accentCyan,
-                fontSize = 16.sp,
-                fontWeight = FontWeight.Bold
+            Image(
+                painter = painterResource(id = R.drawable.ic_ravex_wolf),
+                contentDescription = "Ravex Bubble",
+                modifier = Modifier.size(36.dp)
             )
         }
     } else {
-        // Expanded Tactical HUD Bar
+        // Expanded Sharingan Tactical HUD Bar
         Row(
             modifier = Modifier
-                .clip(RoundedCornerShape(12.dp))
-                .background(darkBg.copy(alpha = 0.92f))
-                .border(1.5.dp, accentCyan, RoundedCornerShape(12.dp))
-                .padding(horizontal = 12.dp, vertical = 8.dp),
+                .clip(RoundedCornerShape(14.dp))
+                .background(darkBg.copy(alpha = 0.95f))
+                .border(1.5.dp, accentCyan, RoundedCornerShape(14.dp))
+                .padding(horizontal = 12.dp, vertical = 8.dp)
+                .clickable { onToggleExpand() },
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(12.dp)
+            horizontalArrangement = Arrangement.spacedBy(14.dp)
         ) {
-            Box(
-                modifier = Modifier
-                    .size(32.dp)
-                    .clip(CircleShape)
-                    .background(accentRed.copy(alpha = 0.2f))
-                    .clickable { onToggleExpand() },
-                contentAlignment = Alignment.Center
-            ) {
-                Text(text = "RX", color = accentRed, fontWeight = FontWeight.Bold, fontSize = 12.sp)
-            }
+            Image(
+                painter = painterResource(id = R.drawable.ic_ravex_wolf),
+                contentDescription = "Collapse",
+                modifier = Modifier.size(28.dp)
+            )
 
             Column {
-                Text(text = "FPS", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(text = "FPS", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${metrics.fps}",
                     color = Color.White,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.ExtraBold
                 )
             }
 
             Column {
-                Text(text = "RAM", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(text = "RAM", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${metrics.ramPercentage.toInt()}%",
                     color = if (metrics.ramPercentage > 85f) accentRed else accentCyan,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             Column {
-                Text(text = "TEMP", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(text = "TEMP", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${metrics.batteryTempC.toInt()}°C",
                     color = if (metrics.batteryTempC >= 40f) accentRed else Color.Green,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
 
             Column {
-                Text(text = "PING", color = Color.Gray, fontSize = 9.sp, fontWeight = FontWeight.Bold)
+                Text(text = "PING", color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
                 Text(
                     text = "${metrics.pingMs}ms",
                     color = Color.Yellow,
-                    fontSize = 14.sp,
+                    fontSize = 13.sp,
                     fontWeight = FontWeight.Bold
                 )
             }
