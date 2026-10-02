@@ -10,6 +10,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.itemsIndexed
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -34,8 +35,10 @@ import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.graphics.drawable.toBitmap
 import com.akira.ravex.R
+import com.akira.ravex.data.CrosshairPresetsRepository
 import com.akira.ravex.data.RavexPreferences
 import com.akira.ravex.model.GameInfo
+import com.akira.ravex.model.GameProfile
 import com.akira.ravex.model.SystemMetrics
 import com.akira.ravex.service.RavexOverlayService
 import com.akira.ravex.service.ThermalGuardService
@@ -51,14 +54,12 @@ fun GameForgeLandscapeScreen(
     onNavigateTab: (String) -> Unit
 ) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
 
     var metrics by remember { mutableStateOf(SystemMetrics()) }
     var games by remember { mutableStateOf<List<GameInfo>>(emptyList()) }
     var selectedIndex by remember { mutableStateOf(0) }
-    var isBoosting by remember { mutableStateOf(false) }
-    var boostMessage by remember { mutableStateOf("") }
     var launchErrorMsg by remember { mutableStateOf("") }
+    var targetCrosshairDialogGame by remember { mutableStateOf<GameInfo?>(null) }
 
     LaunchedEffect(Unit) {
         games = SystemMonitorUtil.getInstalledGames(context)
@@ -73,19 +74,21 @@ fun GameForgeLandscapeScreen(
             .fillMaxSize()
             .background(RavexBlack)
     ) {
-        // Sharingan Ambient Canvas Centerpiece
+        // Sharingan Ambient Canvas Centerpiece (Positioned slightly higher to leave room for PLAY button underneath)
         Box(
-            modifier = Modifier.fillMaxSize(),
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(bottom = 90.dp),
             contentAlignment = Alignment.Center
         ) {
-            SharinganEyeView(sizeDp = 220.dp)
+            SharinganEyeView(sizeDp = 190.dp)
         }
 
         // Top Header Bar - Telemetry & Branding
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .padding(horizontal = 16.dp, vertical = 10.dp),
+                .padding(horizontal = 16.dp, vertical = 8.dp),
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
@@ -97,13 +100,13 @@ fun GameForgeLandscapeScreen(
                 Image(
                     painter = painterResource(id = R.drawable.ic_ravex_wolf),
                     contentDescription = "Ravex Wolf Logo",
-                    modifier = Modifier.size(36.dp)
+                    modifier = Modifier.size(34.dp)
                 )
                 Column {
                     Text(
                         text = "AKIRA RAVEX",
                         color = RavexCyan,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 1.5.sp
                     )
@@ -121,11 +124,11 @@ fun GameForgeLandscapeScreen(
             SharinganTelemetryHeader(metrics = metrics)
         }
 
-        // Center PLAY Button
+        // Center PLAY Button Positioned DIRECTLY BELOW the Sharingan Eye Centerpiece
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 60.dp),
+                .padding(top = 110.dp),
             contentAlignment = Alignment.Center
         ) {
             val selectedGame = games.getOrNull(selectedIndex)
@@ -133,10 +136,20 @@ fun GameForgeLandscapeScreen(
             Button(
                 onClick = {
                     if (selectedGame != null) {
+                        // Apply targeted game crosshair profile if set
+                        val profiles = ravexPrefs.getGameProfiles()
+                        val profile = profiles[selectedGame.packageName]
+                        if (profile != null) {
+                            ravexPrefs.activeCrosshairId = profile.assignedCrosshairId
+                        }
+
                         val launchIntent = context.packageManager.getLaunchIntentForPackage(selectedGame.packageName)
                         if (launchIntent != null) {
                             if (ravexPrefs.isHudEnabled && Settings.canDrawOverlays(context)) {
-                                context.startService(Intent(context, RavexOverlayService::class.java))
+                                val intent = Intent(context, RavexOverlayService::class.java).apply {
+                                    action = RavexOverlayService.ACTION_REFRESH_CROSSHAIR
+                                }
+                                context.startService(intent)
                             }
                             context.startActivity(launchIntent)
                         } else {
@@ -147,11 +160,11 @@ fun GameForgeLandscapeScreen(
                     }
                 },
                 colors = ButtonDefaults.buttonColors(containerColor = RavexCyan),
-                shape = RoundedCornerShape(24.dp),
+                shape = RoundedCornerShape(20.dp),
                 modifier = Modifier
-                    .width(180.dp)
-                    .height(46.dp)
-                    .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(24.dp))
+                    .width(170.dp)
+                    .height(42.dp)
+                    .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
             ) {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
@@ -161,12 +174,12 @@ fun GameForgeLandscapeScreen(
                         Icons.Default.PlayArrow,
                         contentDescription = "Play",
                         tint = RavexBlack,
-                        modifier = Modifier.size(24.dp)
+                        modifier = Modifier.size(22.dp)
                     )
                     Text(
                         text = "PLAY",
                         color = RavexBlack,
-                        fontSize = 18.sp,
+                        fontSize = 17.sp,
                         fontWeight = FontWeight.ExtraBold,
                         letterSpacing = 2.sp
                     )
@@ -179,14 +192,22 @@ fun GameForgeLandscapeScreen(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
                 .fillMaxWidth()
-                .padding(bottom = 48.dp),
+                .padding(bottom = 4.dp),
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
+            Text(
+                text = "Swipe To Select Game",
+                color = RavexTextMuted,
+                fontSize = 9.sp,
+                fontWeight = FontWeight.Bold,
+                modifier = Modifier.padding(bottom = 2.dp)
+            )
+
             if (games.isEmpty()) {
                 Box(
                     modifier = Modifier
                         .fillMaxWidth(0.6f)
-                        .height(80.dp)
+                        .height(70.dp)
                         .clip(RoundedCornerShape(12.dp))
                         .background(RavexSurface)
                         .border(1.dp, RavexSurfaceVariant, RoundedCornerShape(12.dp)),
@@ -195,15 +216,15 @@ fun GameForgeLandscapeScreen(
                     Text(
                         text = "NO INSTALLED GAMES DETECTED - ADD GAMES TO LIBRARY",
                         color = RavexTextMuted,
-                        fontSize = 11.sp,
+                        fontSize = 10.sp,
                         fontWeight = FontWeight.Bold
                     )
                 }
             } else {
                 Row(
                     verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(8.dp),
-                    modifier = Modifier.padding(horizontal = 16.dp)
+                    horizontalArrangement = Arrangement.spacedBy(6.dp),
+                    modifier = Modifier.padding(horizontal = 12.dp)
                 ) {
                     IconButton(
                         onClick = {
@@ -214,14 +235,21 @@ fun GameForgeLandscapeScreen(
                     }
 
                     LazyRow(
-                        horizontalArrangement = Arrangement.spacedBy(12.dp),
+                        horizontalArrangement = Arrangement.spacedBy(10.dp),
                         modifier = Modifier.weight(1f)
                     ) {
                         itemsIndexed(games) { index, game ->
+                            val profiles = ravexPrefs.getGameProfiles()
+                            val assignedCrosshairId = profiles[game.packageName]?.assignedCrosshairId ?: "Default"
+
                             SharinganGameTile(
                                 game = game,
                                 isSelected = index == selectedIndex,
-                                onSelect = { selectedIndex = index }
+                                assignedCrosshairId = assignedCrosshairId,
+                                onSelect = { selectedIndex = index },
+                                onConfigureTargetCrosshair = {
+                                    targetCrosshairDialogGame = game
+                                }
                             )
                         }
                     }
@@ -237,7 +265,16 @@ fun GameForgeLandscapeScreen(
             }
         }
 
-        // Error message popup toast if game cannot launch
+        // Target Crosshair Selection Dialog for a Specific Game
+        targetCrosshairDialogGame?.let { game ->
+            TargetCrosshairDialog(
+                game = game,
+                ravexPrefs = ravexPrefs,
+                onDismiss = { targetCrosshairDialogGame = null }
+            )
+        }
+
+        // Error message popup toast
         if (launchErrorMsg.isNotEmpty()) {
             LaunchedEffect(launchErrorMsg) {
                 delay(2500)
@@ -248,14 +285,14 @@ fun GameForgeLandscapeScreen(
                 shape = RoundedCornerShape(8.dp),
                 modifier = Modifier
                     .align(Alignment.TopCenter)
-                    .padding(top = 70.dp)
+                    .padding(top = 60.dp)
             ) {
                 Text(
                     text = launchErrorMsg,
                     color = Color.White,
                     fontWeight = FontWeight.Bold,
-                    fontSize = 12.sp,
-                    modifier = Modifier.padding(horizontal = 16.dp, vertical = 8.dp)
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(horizontal = 14.dp, vertical = 6.dp)
                 )
             }
         }
@@ -298,7 +335,9 @@ fun TelemetryHeaderItem(label: String, value: String, isAlert: Boolean) {
 fun SharinganGameTile(
     game: GameInfo,
     isSelected: Boolean,
-    onSelect: () -> Unit
+    assignedCrosshairId: String,
+    onSelect: () -> Unit,
+    onConfigureTargetCrosshair: () -> Unit
 ) {
     val borderColor = if (isSelected) RavexCyan else RavexSurfaceVariant
     val bgColor = if (isSelected) RavexSurfaceVariant else RavexSurface
@@ -307,8 +346,8 @@ fun SharinganGameTile(
         colors = CardDefaults.cardColors(containerColor = bgColor),
         shape = RoundedCornerShape(12.dp),
         modifier = Modifier
-            .width(130.dp)
-            .height(72.dp)
+            .width(135.dp)
+            .height(68.dp)
             .border(
                 width = if (isSelected) 2.dp else 1.dp,
                 color = borderColor,
@@ -319,9 +358,9 @@ fun SharinganGameTile(
         Row(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(8.dp),
+                .padding(6.dp),
             verticalAlignment = Alignment.CenterVertically,
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
+            horizontalArrangement = Arrangement.spacedBy(6.dp)
         ) {
             val iconDrawable = game.icon
             if (iconDrawable != null) {
@@ -330,13 +369,13 @@ fun SharinganGameTile(
                     bitmap = bitmap,
                     contentDescription = game.appName,
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(8.dp))
                 )
             } else {
                 Box(
                     modifier = Modifier
-                        .size(36.dp)
+                        .size(34.dp)
                         .clip(RoundedCornerShape(8.dp))
                         .background(RavexRed),
                     contentAlignment = Alignment.Center
@@ -345,16 +384,16 @@ fun SharinganGameTile(
                         text = game.appName.take(1).uppercase(),
                         color = Color.White,
                         fontWeight = FontWeight.Bold,
-                        fontSize = 16.sp
+                        fontSize = 14.sp
                     )
                 }
             }
 
-            Column {
+            Column(modifier = Modifier.weight(1f)) {
                 Text(
                     text = game.appName,
                     color = RavexTextWhite,
-                    fontSize = 11.sp,
+                    fontSize = 10.sp,
                     fontWeight = FontWeight.Bold,
                     maxLines = 1
                 )
@@ -364,7 +403,72 @@ fun SharinganGameTile(
                     fontSize = 8.sp,
                     fontWeight = FontWeight.Bold
                 )
+                Text(
+                    text = "Crosshair >",
+                    color = RavexRed,
+                    fontSize = 7.5.sp,
+                    fontWeight = FontWeight.Bold,
+                    modifier = Modifier.clickable { onConfigureTargetCrosshair() }
+                )
             }
         }
     }
+}
+
+@Composable
+fun TargetCrosshairDialog(
+    game: GameInfo,
+    ravexPrefs: RavexPreferences,
+    onDismiss: () -> Unit
+) {
+    val presets = remember { CrosshairPresetsRepository.presets }
+    var selectedPresetId by remember {
+        mutableStateOf(ravexPrefs.getGameProfiles()[game.packageName]?.assignedCrosshairId ?: presets.first().id)
+    }
+
+    AlertDialog(
+        onDismissRequest = onDismiss,
+        containerColor = RavexSurface,
+        title = { Text("TARGET CROSSHAIR: ${game.appName}", color = RavexCyan, fontSize = 14.sp, fontWeight = FontWeight.Bold) },
+        text = {
+            Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                Text("Select a target crosshair for ${game.appName}. This crosshair will automatically activate whenever you launch this game:", color = RavexTextWhite, fontSize = 11.sp)
+
+                LazyRow(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+                    items(presets.take(20)) { preset ->
+                        Button(
+                            onClick = { selectedPresetId = preset.id },
+                            colors = ButtonDefaults.buttonColors(
+                                containerColor = if (selectedPresetId == preset.id) RavexCyan else RavexSurfaceVariant
+                            )
+                        ) {
+                            Text(preset.name.take(12), fontSize = 9.sp, color = if (selectedPresetId == preset.id) RavexBlack else Color.White)
+                        }
+                    }
+                }
+            }
+        },
+        confirmButton = {
+            Button(
+                onClick = {
+                    ravexPrefs.saveGameProfile(
+                        GameProfile(
+                            packageName = game.packageName,
+                            gameName = game.appName,
+                            assignedCrosshairId = selectedPresetId
+                        )
+                    )
+                    onDismiss()
+                },
+                colors = ButtonDefaults.buttonColors(containerColor = RavexCyan)
+            ) {
+                Text("SAVE TARGET", color = RavexBlack, fontWeight = FontWeight.Bold, fontSize = 11.sp)
+            }
+        },
+        dismissButton = {
+            TextButton(onClick = onDismiss) {
+                Text("CANCEL", color = RavexTextMuted, fontSize = 11.sp)
+            }
+        }
+    )
 }
