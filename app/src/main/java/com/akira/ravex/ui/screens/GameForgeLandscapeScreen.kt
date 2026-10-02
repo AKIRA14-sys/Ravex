@@ -61,6 +61,10 @@ fun GameForgeLandscapeScreen(
     var launchErrorMsg by remember { mutableStateOf("") }
     var targetCrosshairDialogGame by remember { mutableStateOf<GameInfo?>(null) }
 
+    var isCrosshairEnabled by remember { mutableStateOf(ravexPrefs.isCrosshairEnabled) }
+    var isHudEnabled by remember { mutableStateOf(ravexPrefs.isHudEnabled) }
+    var selectedGameMode by remember { mutableStateOf(ravexPrefs.gameMode) }
+
     LaunchedEffect(Unit) {
         games = SystemMonitorUtil.getInstalledGames(context)
         while (true) {
@@ -74,14 +78,14 @@ fun GameForgeLandscapeScreen(
             .fillMaxSize()
             .background(RavexBlack)
     ) {
-        // Sharingan Ambient Canvas Centerpiece (Positioned slightly higher to leave room for PLAY button underneath)
+        // Sharingan Ambient Canvas Centerpiece (Slightly elevated to match Sharingan UI reference)
         Box(
             modifier = Modifier
                 .fillMaxSize()
-                .padding(bottom = 90.dp),
+                .padding(bottom = 85.dp),
             contentAlignment = Alignment.Center
         ) {
-            SharinganEyeView(sizeDp = 190.dp)
+            SharinganEyeView(sizeDp = 185.dp)
         }
 
         // Top Header Bar - Telemetry & Branding
@@ -92,7 +96,7 @@ fun GameForgeLandscapeScreen(
             horizontalArrangement = Arrangement.SpaceBetween,
             verticalAlignment = Alignment.CenterVertically
         ) {
-            // Brand Logo & Title
+            // Brand Logo & Title matching official Wolf Logo
             Row(
                 verticalAlignment = Alignment.CenterVertically,
                 horizontalArrangement = Arrangement.spacedBy(10.dp)
@@ -120,7 +124,7 @@ fun GameForgeLandscapeScreen(
                 }
             }
 
-            // Tech Telemetry HUD Header Widget
+            // Tech Telemetry HUD Header Widget (RAM, FPS, TEMP, BATTERY, PING)
             SharinganTelemetryHeader(metrics = metrics)
         }
 
@@ -133,61 +137,86 @@ fun GameForgeLandscapeScreen(
         ) {
             val selectedGame = games.getOrNull(selectedIndex)
 
-            Button(
-                onClick = {
-                    if (selectedGame != null) {
-                        // Apply targeted game crosshair profile if set
-                        val profiles = ravexPrefs.getGameProfiles()
-                        val profile = profiles[selectedGame.packageName]
-                        if (profile != null) {
-                            ravexPrefs.activeCrosshairId = profile.assignedCrosshairId
-                        }
-
-                        val launchIntent = context.packageManager.getLaunchIntentForPackage(selectedGame.packageName)
-                        if (launchIntent != null) {
-                            if (ravexPrefs.isHudEnabled && Settings.canDrawOverlays(context)) {
-                                val intent = Intent(context, RavexOverlayService::class.java).apply {
-                                    action = RavexOverlayService.ACTION_REFRESH_CROSSHAIR
-                                }
-                                context.startService(intent)
+            Column(horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(6.dp)) {
+                Button(
+                    onClick = {
+                        if (selectedGame != null) {
+                            val profiles = ravexPrefs.getGameProfiles()
+                            val profile = profiles[selectedGame.packageName]
+                            if (profile != null) {
+                                ravexPrefs.activeCrosshairId = profile.assignedCrosshairId
                             }
-                            context.startActivity(launchIntent)
+
+                            val launchIntent = context.packageManager.getLaunchIntentForPackage(selectedGame.packageName)
+                            if (launchIntent != null) {
+                                if (ravexPrefs.isHudEnabled && Settings.canDrawOverlays(context)) {
+                                    val intent = Intent(context, RavexOverlayService::class.java).apply {
+                                        action = RavexOverlayService.ACTION_REFRESH_CROSSHAIR
+                                    }
+                                    context.startService(intent)
+                                }
+                                context.startActivity(launchIntent)
+                            } else {
+                                launchErrorMsg = "GAME COULD NOT BE LAUNCHED"
+                            }
                         } else {
-                            launchErrorMsg = "GAME COULD NOT BE LAUNCHED"
+                            launchErrorMsg = "NO REAL INSTALLED GAME SELECTED"
                         }
-                    } else {
-                        launchErrorMsg = "NO REAL INSTALLED GAME SELECTED"
-                    }
-                },
-                colors = ButtonDefaults.buttonColors(containerColor = RavexCyan),
-                shape = RoundedCornerShape(20.dp),
-                modifier = Modifier
-                    .width(170.dp)
-                    .height(42.dp)
-                    .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
-            ) {
-                Row(
-                    verticalAlignment = Alignment.CenterVertically,
-                    horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    },
+                    colors = ButtonDefaults.buttonColors(containerColor = RavexCyan),
+                    shape = RoundedCornerShape(20.dp),
+                    modifier = Modifier
+                        .width(170.dp)
+                        .height(42.dp)
+                        .border(2.dp, Color.White.copy(alpha = 0.8f), RoundedCornerShape(20.dp))
                 ) {
-                    Icon(
-                        Icons.Default.PlayArrow,
-                        contentDescription = "Play",
-                        tint = RavexBlack,
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text(
-                        text = "PLAY",
-                        color = RavexBlack,
-                        fontSize = 17.sp,
-                        fontWeight = FontWeight.ExtraBold,
-                        letterSpacing = 2.sp
-                    )
+                    Row(
+                        verticalAlignment = Alignment.CenterVertically,
+                        horizontalArrangement = Arrangement.spacedBy(6.dp)
+                    ) {
+                        Icon(
+                            Icons.Default.PlayArrow,
+                            contentDescription = "Play",
+                            tint = RavexBlack,
+                            modifier = Modifier.size(22.dp)
+                        )
+                        Text(
+                            text = "PLAY",
+                            color = RavexBlack,
+                            fontSize = 17.sp,
+                            fontWeight = FontWeight.ExtraBold,
+                            letterSpacing = 2.sp
+                        )
+                    }
+                }
+
+                // Game Mode Switcher Chips directly under PLAY
+                Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+                    listOf("BALANCED", "PERFORMANCE", "ULTRA").forEach { mode ->
+                        val isSelected = selectedGameMode == mode
+                        Box(
+                            modifier = Modifier
+                                .clip(RoundedCornerShape(6.dp))
+                                .background(if (isSelected) RavexRed else RavexSurfaceVariant)
+                                .clickable {
+                                    selectedGameMode = mode
+                                    ravexPrefs.gameMode = mode
+                                }
+                                .padding(horizontal = 8.dp, vertical = 2.dp)
+                        ) {
+                            Text(
+                                text = mode,
+                                color = if (isSelected) Color.White else RavexTextMuted,
+                                fontSize = 8.5.sp,
+                                fontWeight = FontWeight.Bold
+                            )
+                        }
+                    }
                 }
             }
         }
 
-        // Bottom Real Games Carousel Section
+        // Bottom Real Games Carousel Section with ">>> SWIPE TO SELECT GAME <<<" Banner
         Column(
             modifier = Modifier
                 .align(Alignment.BottomCenter)
@@ -196,10 +225,11 @@ fun GameForgeLandscapeScreen(
             horizontalAlignment = Alignment.CenterHorizontally
         ) {
             Text(
-                text = "Swipe To Select Game",
-                color = RavexTextMuted,
+                text = ">>>  SWIPE TO SELECT GAME  <<<",
+                color = RavexCyan,
                 fontSize = 9.sp,
                 fontWeight = FontWeight.Bold,
+                letterSpacing = 1.sp,
                 modifier = Modifier.padding(bottom = 2.dp)
             )
 
