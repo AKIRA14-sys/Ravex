@@ -9,12 +9,7 @@ import androidx.activity.compose.setContent
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.material.icons.Icons
-import androidx.compose.material.icons.filled.Build
-import androidx.compose.material.icons.filled.Home
-import androidx.compose.material.icons.filled.Info
-import androidx.compose.material.icons.filled.Lock
-import androidx.compose.material.icons.filled.Settings
-import androidx.compose.material.icons.filled.Star
+import androidx.compose.material.icons.filled.*
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Modifier
@@ -30,11 +25,16 @@ import com.akira.ravex.util.RavexGuard
 
 enum class SharinganNavigationTab(val label: String, val icon: ImageVector) {
     GAMEFORGE("GAMEFORGE", Icons.Default.Home),
-    PERFORMANCE("PERFORMANCE", Icons.Default.Info),
-    GAMES("GAMES", Icons.Default.Build),
-    HUD("HUD", Icons.Default.Lock),
+    COPILOT("AI COPILOT", Icons.Default.Person),
+    LAG_DIAG("LAG DIAG", Icons.Default.Warning),
+    CAMERA("AI CAMERA", Icons.Default.PlayArrow),
+    VOICE("VOICE", Icons.Default.Call),
+    CROSSHAIR("CROSSHAIR", Icons.Default.Build),
+    PROFILES("PROFILES", Icons.Default.List),
+    PERFORMANCE("HEALTH", Icons.Default.Info),
     NETWORK("NETWORK", Icons.Default.Star),
-    SETTINGS("SETTINGS", Icons.Default.Settings)
+    HUD_SETTINGS("HUD", Icons.Default.Lock),
+    CORE_AI("CORE AI", Icons.Default.Settings)
 }
 
 class MainActivity : ComponentActivity() {
@@ -71,14 +71,14 @@ fun MainAppScaffold(ravexPrefs: RavexPreferences) {
             NavigationBar(
                 containerColor = RavexSurface,
                 tonalElevation = 8.dp,
-                modifier = Modifier.height(44.dp)
+                modifier = Modifier.height(46.dp)
             ) {
                 SharinganNavigationTab.values().forEach { tab ->
                     NavigationBarItem(
                         selected = selectedTab == tab,
                         onClick = { selectedTab = tab },
-                        icon = { Icon(tab.icon, contentDescription = tab.label, modifier = Modifier.size(16.dp)) },
-                        label = { Text(tab.label, fontSize = 8.5.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold) },
+                        icon = { Icon(tab.icon, contentDescription = tab.label, modifier = Modifier.size(15.dp)) },
+                        label = { Text(tab.label, fontSize = 7.5.sp, fontWeight = androidx.compose.ui.text.font.FontWeight.Bold, maxLines = 1) },
                         colors = NavigationBarItemDefaults.colors(
                             selectedIconColor = RavexCyan,
                             selectedTextColor = RavexCyan,
@@ -102,17 +102,35 @@ fun MainAppScaffold(ravexPrefs: RavexPreferences) {
                     ravexPrefs = ravexPrefs,
                     onNavigateTab = { tabName ->
                         when (tabName) {
-                            "GAMES" -> selectedTab = SharinganNavigationTab.GAMES
+                            "COPILOT" -> selectedTab = SharinganNavigationTab.COPILOT
+                            "GAMES" -> selectedTab = SharinganNavigationTab.CROSSHAIR
                             "PERFORMANCE" -> selectedTab = SharinganNavigationTab.PERFORMANCE
-                            "HUD" -> selectedTab = SharinganNavigationTab.HUD
+                            "HUD" -> selectedTab = SharinganNavigationTab.HUD_SETTINGS
                         }
                     }
                 )
+                SharinganNavigationTab.COPILOT -> RavexCopilotScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.LAG_DIAG -> SmartLagDetectionScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.CAMERA -> AiCameraScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.VOICE -> AiVoiceCommandsScreen(
+                    ravexPrefs = ravexPrefs,
+                    onNavigateTab = { target ->
+                        when (target) {
+                            "COPILOT" -> selectedTab = SharinganNavigationTab.COPILOT
+                            "PERFORMANCE" -> selectedTab = SharinganNavigationTab.PERFORMANCE
+                            "CROSSHAIR" -> selectedTab = SharinganNavigationTab.CROSSHAIR
+                            "NETWORK" -> selectedTab = SharinganNavigationTab.NETWORK
+                            "LAG" -> selectedTab = SharinganNavigationTab.LAG_DIAG
+                            "SETTINGS" -> selectedTab = SharinganNavigationTab.CORE_AI
+                        }
+                    }
+                )
+                SharinganNavigationTab.CROSSHAIR -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.PROFILES -> GameProfilesScreen(ravexPrefs = ravexPrefs)
                 SharinganNavigationTab.PERFORMANCE -> PhoneHealthLandscapeScreen()
-                SharinganNavigationTab.GAMES -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
-                SharinganNavigationTab.HUD -> ThermalGuardScreen(ravexPrefs = ravexPrefs)
-                SharinganNavigationTab.NETWORK -> RavexNetworkScreen()
-                SharinganNavigationTab.SETTINGS -> RavexGuardScreen()
+                SharinganNavigationTab.NETWORK -> SmartNetworkScreen()
+                SharinganNavigationTab.HUD_SETTINGS -> PersonalizedHudSettingsScreen(ravexPrefs = ravexPrefs)
+                SharinganNavigationTab.CORE_AI -> RavexCoreAiScreen(ravexPrefs = ravexPrefs)
             }
         }
     }

@@ -1,6 +1,5 @@
 package com.akira.ravex.service
 
-import android.app.Notification
 import android.app.NotificationChannel
 import android.app.NotificationManager
 import android.app.Service
@@ -9,9 +8,9 @@ import android.content.Intent
 import android.graphics.PixelFormat
 import android.os.Build
 import android.os.IBinder
-import android.provider.Settings
 import android.view.Gravity
 import android.view.WindowManager
+import androidx.compose.animation.*
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
@@ -22,6 +21,8 @@ import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -30,119 +31,107 @@ import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.input.pointer.pointerInput
 import androidx.compose.ui.platform.ComposeView
+import androidx.compose.ui.platform.ViewCompositionStrategy
 import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import androidx.core.app.NotificationCompat
-import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
+import androidx.savedstate.setViewTreeSavedStateRegistryOwner
 import com.akira.ravex.R
 import com.akira.ravex.data.CrosshairPresetsRepository
 import com.akira.ravex.data.RavexPreferences
-import com.akira.ravex.model.CrosshairPreset
-import com.akira.ravex.model.SystemMetrics
 import com.akira.ravex.ui.components.CrosshairCanvas
-import com.akira.ravex.util.SystemMonitorUtil
-import kotlinx.coroutines.CoroutineScope
-import kotlinx.coroutines.Dispatchers
-import kotlinx.coroutines.Job
-import kotlinx.coroutines.delay
-import kotlinx.coroutines.launch
+import com.akira.ravex.ui.screens.*
+import com.akira.ravex.ui.theme.*
+
+enum class HudTabModule(val label: String) {
+    COPILOT("COPILOT"),
+    LAG_DIAGNOSIS("LAG DIAG"),
+    PROFILES("PROFILES"),
+    CROSSHAIR("CROSSHAIR"),
+    AI_CAMERA("CAMERA"),
+    VOICE_CMD("VOICE"),
+    COACH("COACH"),
+    TROUBLESHOOT("REPAIR"),
+    NETWORK("NETWORK"),
+    PERFORMANCE("HEALTH"),
+    HUD_SETTINGS("HUD SETTINGS")
+}
 
 class RavexOverlayService : Service() {
 
-    private lateinit var windowManager: WindowManager
-    private lateinit var ravexPrefs: RavexPreferences
-    private val lifecycleOwner = OverlayLifecycleOwner()
-    private val serviceScope = CoroutineScope(Dispatchers.Main + Job())
-
-    private var hudView: ComposeView? = null
-    private var crosshairView: ComposeView? = null
-
-    private var metricsState by mutableStateOf(SystemMetrics())
-    private var activePresetState by mutableStateOf<CrosshairPreset?>(null)
-    private var isExpanded by mutableStateOf(false)
-    private var isCrosshairEnabledState by mutableStateOf(true)
-
-    private var monitorJob: Job? = null
-
     companion object {
-        private const val NOTIF_CHANNEL_ID = "ravex_overlay_channel"
-        private const val NOTIF_ID = 1001
-        const val ACTION_STOP_HUD = "com.akira.ravex.ACTION_STOP_HUD"
         const val ACTION_REFRESH_CROSSHAIR = "com.akira.ravex.ACTION_REFRESH_CROSSHAIR"
     }
 
+    private lateinit var windowManager: WindowManager
+    private lateinit var ravexPrefs: RavexPreferences
+    private lateinit var overlayLifecycleOwner: OverlayLifecycleOwner
+
+    private var bubbleView: ComposeView? = null
+    private var crosshairOverlayView: ComposeView? = null
+
+    private var bubbleParams: WindowManager.LayoutParams? = null
+
     override fun onCreate() {
         super.onCreate()
-        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
         ravexPrefs = RavexPreferences(this)
-        lifecycleOwner.onCreate()
-        lifecycleOwner.onStart()
-        lifecycleOwner.onResume()
+        windowManager = getSystemService(Context.WINDOW_SERVICE) as WindowManager
 
-        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
+        overlayLifecycleOwner = OverlayLifecycleOwner()
+        overlayLifecycleOwner.onCreate()
+        overlayLifecycleOwner.onStart()
+        overlayLifecycleOwner.onResume()
 
-        createNotificationChannel()
-        startForeground(NOTIF_ID, buildNotification())
-
-        startMetricsMonitor()
-        refreshActivePreset()
-
-        if (Settings.canDrawOverlays(this)) {
-            setupCrosshairOverlay()
-            setupHudOverlay()
-        }
+        startForegroundServiceNotification()
+        setupCrosshairOverlay()
+        setupFloatingBubbleOverlay()
     }
 
-    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
-        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
-        when (intent?.action) {
-            ACTION_STOP_HUD -> stopSelf()
-            ACTION_REFRESH_CROSSHAIR -> refreshActivePreset()
-        }
-        return START_STICKY
+    private fun attachLifecycleToComposeView(composeView: ComposeView) {
+        composeView.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+        composeView.setViewTreeLifecycleOwner(overlayLifecycleOwner)
+        composeView.setViewTreeViewModelStoreOwner(overlayLifecycleOwner)
+        composeView.setViewTreeSavedStateRegistryOwner(overlayLifecycleOwner)
     }
 
-    private fun refreshActivePreset() {
-        isCrosshairEnabledState = ravexPrefs.isCrosshairEnabled
-        val presetId = ravexPrefs.activeCrosshairId
-        val customPresets = ravexPrefs.getCustomPresets()
-        val customMatch = customPresets.firstOrNull { it.id == presetId }
-        activePresetState = customMatch ?: CrosshairPresetsRepository.getPresetById(presetId)
-    }
-
-    private fun updateActivePreset(newPreset: CrosshairPreset) {
-        activePresetState = newPreset
-        ravexPrefs.activeCrosshairId = newPreset.id
-        if (newPreset.isCustom) {
-            ravexPrefs.saveCustomPreset(newPreset)
+    private fun startForegroundServiceNotification() {
+        val channelId = "ravex_hud_channel"
+        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            val channel = NotificationChannel(
+                channelId,
+                "RAVEX Floating Gaming HUD",
+                NotificationManager.IMPORTANCE_LOW
+            )
+            val manager = getSystemService(NotificationManager::class.java)
+            manager.createNotificationChannel(channel)
         }
-    }
 
-    private fun startMetricsMonitor() {
-        monitorJob?.cancel()
-        monitorJob = serviceScope.launch {
-            while (true) {
-                val metrics = SystemMonitorUtil.getSystemMetrics(this@RavexOverlayService)
-                metricsState = metrics
-                delay(1000)
-            }
-        }
+        val notification = NotificationCompat.Builder(this, channelId)
+            .setContentTitle("AKIRA RAVEX HUD Active")
+            .setContentText("Floating overlay & visual crosshair running")
+            .setSmallIcon(R.drawable.ic_ravex_wolf)
+            .setPriority(NotificationCompat.PRIORITY_LOW)
+            .build()
+
+        startForeground(2001, notification)
     }
 
     private fun setupCrosshairOverlay() {
-        if (crosshairView != null) return
+        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
+            WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
+        } else {
+            @Suppress("DEPRECATION")
+            WindowManager.LayoutParams.TYPE_PHONE
+        }
 
-        val params = WindowManager.LayoutParams(
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            WindowManager.LayoutParams.WRAP_CONTENT,
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
-                WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-            else
-                WindowManager.LayoutParams.TYPE_PHONE,
+        val crosshairParams = WindowManager.LayoutParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -151,331 +140,210 @@ class RavexOverlayService : Service() {
             gravity = Gravity.CENTER
         }
 
-        crosshairView = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(lifecycleOwner)
-            setViewTreeViewModelStoreOwner(lifecycleOwner)
-            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+        crosshairOverlayView = ComposeView(this).apply {
+            attachLifecycleToComposeView(this)
             setContent {
-                val preset = activePresetState
-                if (isCrosshairEnabledState && preset != null) {
-                    CrosshairCanvas(preset = preset)
+                AkiraRavexTheme {
+                    var activeId by remember { mutableStateOf(ravexPrefs.activeCrosshairId) }
+                    var isEnabled by remember { mutableStateOf(ravexPrefs.isCrosshairEnabled) }
+
+                    LaunchedEffect(Unit) {
+                        while (true) {
+                            activeId = ravexPrefs.activeCrosshairId
+                            isEnabled = ravexPrefs.isCrosshairEnabled
+                            kotlinx.coroutines.delay(200)
+                        }
+                    }
+
+                    if (isEnabled) {
+                        val preset = CrosshairPresetsRepository.getPresetById(activeId) ?: CrosshairPresetsRepository.presets.first()
+                        Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                            CrosshairCanvas(preset = preset, modifier = Modifier.size((preset.sizeDp * 2.5f).dp))
+                        }
+                    }
                 }
             }
         }
 
         try {
-            windowManager.addView(crosshairView, params)
+            windowManager.addView(crosshairOverlayView, crosshairParams)
         } catch (e: Exception) {
             e.printStackTrace()
         }
     }
 
-    private fun setupHudOverlay() {
-        if (hudView != null) return
-
-        val overlayType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O)
+    private fun setupFloatingBubbleOverlay() {
+        val layoutType = if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY
-        else
+        } else {
+            @Suppress("DEPRECATION")
             WindowManager.LayoutParams.TYPE_PHONE
+        }
 
-        val params = WindowManager.LayoutParams(
+        bubbleParams = WindowManager.LayoutParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
-            overlayType,
+            layoutType,
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
             PixelFormat.TRANSLUCENT
         ).apply {
             gravity = Gravity.TOP or Gravity.START
-            x = 80
-            y = 120
+            x = 50
+            y = 200
         }
 
-        hudView = ComposeView(this).apply {
-            setViewTreeLifecycleOwner(lifecycleOwner)
-            setViewTreeViewModelStoreOwner(lifecycleOwner)
-            setViewTreeSavedStateRegistryOwner(lifecycleOwner)
+        bubbleView = ComposeView(this).apply {
+            attachLifecycleToComposeView(this)
             setContent {
-                SharinganHudBubbleComposable(
-                    metrics = metricsState,
-                    activePreset = activePresetState,
-                    isExpanded = isExpanded,
-                    isCrosshairEnabled = isCrosshairEnabledState,
-                    onToggleExpand = { isExpanded = !isExpanded },
-                    onToggleCrosshair = { enabled ->
-                        isCrosshairEnabledState = enabled
-                        ravexPrefs.isCrosshairEnabled = enabled
-                    },
-                    onPresetChanged = { updatedPreset ->
-                        updateActivePreset(updatedPreset)
-                    },
-                    onDragDelta = { dx, dy ->
-                        params.x += dx.toInt()
-                        params.y += dy.toInt()
-                        try {
-                            windowManager.updateViewLayout(hudView, params)
-                        } catch (e: Exception) {
-                            e.printStackTrace()
+                AkiraRavexTheme {
+                    var isExpanded by remember { mutableStateOf(false) }
+                    var activeTab by remember { mutableStateOf(HudTabModule.COPILOT) }
+
+                    fun updateWindowFocus(expanded: Boolean) {
+                        bubbleParams?.flags = if (expanded) {
+                            WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        } else {
+                            WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN
+                        }
+                        windowManager.updateViewLayout(bubbleView, bubbleParams)
+                    }
+
+                    Box {
+                        if (!isExpanded) {
+                            // Collapsed Bubble with Official Wolf Identity Icon
+                            Box(
+                                modifier = Modifier
+                                    .size(54.dp)
+                                    .background(RavexBlack.copy(alpha = 0.9f), CircleShape)
+                                    .border(2.dp, RavexCyan, CircleShape)
+                                    .pointerInput(Unit) {
+                                        detectDragGestures { change, dragAmount ->
+                                            change.consume()
+                                            bubbleParams?.let { p ->
+                                                p.x += dragAmount.x.toInt()
+                                                p.y += dragAmount.y.toInt()
+                                                windowManager.updateViewLayout(bubbleView, p)
+                                            }
+                                        }
+                                    }
+                                    .clickable {
+                                        isExpanded = true
+                                        updateWindowFocus(true)
+                                    },
+                                contentAlignment = Alignment.Center
+                            ) {
+                                Image(
+                                    painter = painterResource(id = R.drawable.ic_ravex_wolf),
+                                    contentDescription = "RAVEX HUD",
+                                    modifier = Modifier
+                                        .size(38.dp)
+                                        .clip(CircleShape)
+                                )
+                            }
+                        } else {
+                            // Expanded Floating Gaming Panel
+                            Card(
+                                colors = CardDefaults.cardColors(containerColor = RavexSurface.copy(alpha = ravexPrefs.hudOpacityFloat)),
+                                border = androidx.compose.foundation.BorderStroke(1.dp, RavexCyan),
+                                modifier = Modifier
+                                    .width(360.dp)
+                                    .height(260.dp),
+                                shape = RoundedCornerShape(12.dp)
+                            ) {
+                                Column(modifier = Modifier.padding(8.dp)) {
+                                    // Header Bar
+                                    Row(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.SpaceBetween,
+                                        verticalAlignment = Alignment.CenterVertically
+                                    ) {
+                                        Row(verticalAlignment = Alignment.CenterVertically) {
+                                            Image(
+                                                painter = painterResource(id = R.drawable.ic_ravex_wolf),
+                                                contentDescription = null,
+                                                modifier = Modifier.size(20.dp)
+                                            )
+                                            Spacer(modifier = Modifier.width(6.dp))
+                                            Text("AKIRA RAVEX HUD", color = RavexCyan, fontSize = 12.sp, fontWeight = FontWeight.Bold)
+                                        }
+
+                                        IconButton(
+                                            onClick = {
+                                                isExpanded = false
+                                                updateWindowFocus(false)
+                                            },
+                                            modifier = Modifier.size(22.dp)
+                                        ) {
+                                            Icon(Icons.Default.Close, contentDescription = "Close", tint = RavexRed, modifier = Modifier.size(16.dp))
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(4.dp))
+
+                                    // Navigation Bar
+                                    LazyRow(
+                                        modifier = Modifier.fillMaxWidth(),
+                                        horizontalArrangement = Arrangement.spacedBy(4.dp)
+                                    ) {
+                                        items(HudTabModule.values()) { tab ->
+                                            val isSelected = activeTab == tab
+                                            Box(
+                                                modifier = Modifier
+                                                    .background(if (isSelected) RavexCyan.copy(alpha = 0.3f) else RavexSurfaceVariant, RoundedCornerShape(4.dp))
+                                                    .border(1.dp, if (isSelected) RavexCyan else Color.Transparent, RoundedCornerShape(4.dp))
+                                                    .clickable { activeTab = tab }
+                                                    .padding(horizontal = 8.dp, vertical = 4.dp)
+                                            ) {
+                                                Text(tab.label, color = if (isSelected) RavexCyan else RavexTextMuted, fontSize = 8.5.sp, fontWeight = FontWeight.Bold)
+                                            }
+                                        }
+                                    }
+
+                                    Spacer(modifier = Modifier.height(6.dp))
+
+                                    // Active Panel Content
+                                    Box(
+                                        modifier = Modifier
+                                            .fillMaxWidth()
+                                            .weight(1f)
+                                    ) {
+                                        when (activeTab) {
+                                            HudTabModule.COPILOT -> RavexCopilotScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.LAG_DIAGNOSIS -> SmartLagDetectionScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.PROFILES -> GameProfilesScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.CROSSHAIR -> CrosshairEngineScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.AI_CAMERA -> AiCameraScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.VOICE_CMD -> AiVoiceCommandsScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.COACH -> SessionCoachScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.TROUBLESHOOT -> AiTroubleshooterScreen(ravexPrefs = ravexPrefs)
+                                            HudTabModule.NETWORK -> SmartNetworkScreen()
+                                            HudTabModule.PERFORMANCE -> PhoneHealthLandscapeScreen()
+                                            HudTabModule.HUD_SETTINGS -> PersonalizedHudSettingsScreen(ravexPrefs = ravexPrefs)
+                                        }
+                                    }
+                                }
+                            }
                         }
                     }
-                )
+                }
             }
         }
 
         try {
-            windowManager.addView(hudView, params)
+            windowManager.addView(bubbleView, bubbleParams)
         } catch (e: Exception) {
             e.printStackTrace()
         }
-    }
-
-    private fun createNotificationChannel() {
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.O) {
-            val channel = NotificationChannel(
-                NOTIF_CHANNEL_ID,
-                "RAVEX Floating HUD Service",
-                NotificationManager.IMPORTANCE_LOW
-            ).apply {
-                description = "Shows real-time FPS, RAM, and crosshair overlay during gameplay."
-            }
-            val nm = getSystemService(NotificationManager::class.java)
-            nm.createNotificationChannel(channel)
-        }
-    }
-
-    private fun buildNotification(): Notification {
-        return NotificationCompat.Builder(this, NOTIF_CHANNEL_ID)
-            .setContentTitle("RAVEX GAMEFORGE HUD Active")
-            .setContentText("Overlay system & crosshair active in background")
-            .setSmallIcon(R.drawable.ic_ravex_wolf)
-            .setPriority(NotificationCompat.PRIORITY_LOW)
-            .setOngoing(true)
-            .build()
     }
 
     override fun onDestroy() {
+        overlayLifecycleOwner.onDestroy()
+
+        bubbleView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+        crosshairOverlayView?.let { try { windowManager.removeView(it) } catch (e: Exception) {} }
+
         super.onDestroy()
-        monitorJob?.cancel()
-        try {
-            if (hudView != null) windowManager.removeView(hudView)
-            if (crosshairView != null) windowManager.removeView(crosshairView)
-        } catch (e: Exception) {
-            e.printStackTrace()
-        }
-        lifecycleOwner.onDestroy()
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
-}
-
-@Composable
-fun SharinganHudBubbleComposable(
-    metrics: SystemMetrics,
-    activePreset: CrosshairPreset?,
-    isExpanded: Boolean,
-    isCrosshairEnabled: Boolean,
-    onToggleExpand: () -> Unit,
-    onToggleCrosshair: (Boolean) -> Unit,
-    onPresetChanged: (CrosshairPreset) -> Unit,
-    onDragDelta: (Float, Float) -> Unit
-) {
-    val darkBg = Color(0xFF08080C)
-    val accentCyan = Color(0xFF00F0FF)
-    val accentRed = Color(0xFFE50914)
-
-    val presets = remember { CrosshairPresetsRepository.presets }
-
-    if (!isExpanded) {
-        // Floating Draggable Sharingan / Wolf Bubble Icon
-        Box(
-            modifier = Modifier
-                .size(56.dp)
-                .clip(CircleShape)
-                .background(darkBg)
-                .border(2.5.dp, accentRed, CircleShape)
-                .pointerInput(Unit) {
-                    detectDragGestures { change, dragAmount ->
-                        change.consume()
-                        onDragDelta(dragAmount.x, dragAmount.y)
-                    }
-                }
-                .clickable { onToggleExpand() },
-            contentAlignment = Alignment.Center
-        ) {
-            Image(
-                painter = painterResource(id = R.drawable.ic_ravex_wolf),
-                contentDescription = "Ravex Floating Bubble",
-                modifier = Modifier.size(40.dp)
-            )
-        }
-    } else {
-        // Expanded In-Game Gaming Panel with Master Switches, Telemetry & Interactive In-Game Crosshair Customizer
-        Column(
-            modifier = Modifier
-                .width(320.dp)
-                .clip(RoundedCornerShape(16.dp))
-                .background(darkBg.copy(alpha = 0.96f))
-                .border(1.5.dp, accentCyan, RoundedCornerShape(16.dp))
-                .padding(12.dp),
-            verticalArrangement = Arrangement.spacedBy(10.dp)
-        ) {
-            // Header Row (Functions as drag handle for expanded panel)
-            Row(
-                modifier = Modifier
-                    .fillMaxWidth()
-                    .pointerInput(Unit) {
-                        detectDragGestures { change, dragAmount ->
-                            change.consume()
-                            onDragDelta(dragAmount.x, dragAmount.y)
-                        }
-                    },
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                    Image(
-                        painter = painterResource(id = R.drawable.ic_ravex_wolf),
-                        contentDescription = "Logo",
-                        modifier = Modifier.size(22.dp)
-                    )
-                    Text("RAVEX HUD PANEL", color = accentCyan, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-                }
-
-                Text(
-                    text = "COLLAPSE [X]",
-                    color = accentRed,
-                    fontSize = 10.sp,
-                    fontWeight = FontWeight.Bold,
-                    modifier = Modifier.clickable { onToggleExpand() }
-                )
-            }
-
-            // Real-Time Telemetry Row
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween
-            ) {
-                TelemetryMetricBox("FPS", "${metrics.fps}", Color.White)
-                TelemetryMetricBox("RAM", "${metrics.ramPercentage.toInt()}%", if (metrics.ramPercentage > 85) accentRed else accentCyan)
-                TelemetryMetricBox("TEMP", "${metrics.batteryTempC.toInt()}°C", if (metrics.batteryTempC >= 40) accentRed else Color.Green)
-                TelemetryMetricBox("PING", "${metrics.pingMs}ms", Color.Yellow)
-            }
-
-            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-
-            // Crosshair Toggle Switch inside Floating HUD Panel
-            Row(
-                modifier = Modifier.fillMaxWidth(),
-                horizontalArrangement = Arrangement.SpaceBetween,
-                verticalAlignment = Alignment.CenterVertically
-            ) {
-                Text("CROSSHAIR OVERLAY", color = Color.White, fontSize = 10.5.sp, fontWeight = FontWeight.Bold)
-                Switch(
-                    checked = isCrosshairEnabled,
-                    onCheckedChange = onToggleCrosshair,
-                    modifier = Modifier.height(24.dp)
-                )
-            }
-
-            HorizontalDivider(color = Color.White.copy(alpha = 0.15f))
-
-            // Crosshair Quick Customizer in Bubble Panel
-            if (isCrosshairEnabled) {
-                Text("IN-GAME CROSSHAIR SETTINGS", color = accentRed, fontSize = 11.sp, fontWeight = FontWeight.ExtraBold)
-
-                activePreset?.let { preset ->
-                    // Preset Carousel Picker
-                    Text("Select Preset:", color = Color.Gray, fontSize = 9.5.sp, fontWeight = FontWeight.Bold)
-                    LazyRow(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                        items(presets.take(15)) { p ->
-                            val isSelected = p.id == preset.id
-                            Box(
-                                modifier = Modifier
-                                    .clip(RoundedCornerShape(6.dp))
-                                    .background(if (isSelected) accentCyan else Color(0xFF1A1D28))
-                                    .clickable { onPresetChanged(p) }
-                                    .padding(horizontal = 8.dp, vertical = 4.dp)
-                            ) {
-                                Text(
-                                    text = p.name.take(10),
-                                    color = if (isSelected) Color.Black else Color.White,
-                                    fontSize = 9.sp,
-                                    fontWeight = FontWeight.Bold
-                                )
-                            }
-                        }
-                    }
-
-                    // Size Slider
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Size: ${preset.sizeDp.toInt()}dp", color = Color.White, fontSize = 10.sp)
-                        Slider(
-                            value = preset.sizeDp,
-                            onValueChange = { newSize ->
-                                onPresetChanged(preset.copy(sizeDp = newSize, isCustom = true))
-                            },
-                            valueRange = 10f..45f,
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                        )
-                    }
-
-                    // Opacity Slider
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Opacity: ${(preset.opacity * 100).toInt()}%", color = Color.White, fontSize = 10.sp)
-                        Slider(
-                            value = preset.opacity,
-                            onValueChange = { newOpacity ->
-                                onPresetChanged(preset.copy(opacity = newOpacity, isCustom = true))
-                            },
-                            valueRange = 0.2f..1.0f,
-                            modifier = Modifier.weight(1f).padding(horizontal = 8.dp)
-                        )
-                    }
-
-                    // Color Picker Row
-                    Row(
-                        modifier = Modifier.fillMaxWidth(),
-                        horizontalArrangement = Arrangement.SpaceBetween,
-                        verticalAlignment = Alignment.CenterVertically
-                    ) {
-                        Text("Color:", color = Color.White, fontSize = 10.sp)
-                        val quickColors = listOf("#FF2A55", "#00F0FF", "#39FF14", "#FFD700", "#FFFFFF", "#FF5500")
-                        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                            quickColors.forEach { hex ->
-                                Box(
-                                    modifier = Modifier
-                                        .size(20.dp)
-                                        .clip(CircleShape)
-                                        .background(com.akira.ravex.ui.components.parseColorHex(hex))
-                                        .border(
-                                            width = if (preset.colorHex == hex) 2.dp else 0.dp,
-                                            color = Color.White,
-                                            shape = CircleShape
-                                        )
-                                        .clickable {
-                                            onPresetChanged(preset.copy(colorHex = hex, isCustom = true))
-                                        }
-                                )
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
-}
-
-@Composable
-fun TelemetryMetricBox(label: String, value: String, valueColor: Color) {
-    Column(horizontalAlignment = Alignment.CenterHorizontally) {
-        Text(text = label, color = Color.Gray, fontSize = 8.sp, fontWeight = FontWeight.Bold)
-        Text(text = value, color = valueColor, fontSize = 12.sp, fontWeight = FontWeight.ExtraBold)
-    }
 }

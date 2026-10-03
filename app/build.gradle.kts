@@ -63,6 +63,16 @@ dependencies {
     implementation(libs.google.gson)
     implementation(libs.kotlinx.coroutines.android)
 
+    // CameraX
+    implementation(libs.camerax.core)
+    implementation(libs.camerax.camera2)
+    implementation(libs.camerax.lifecycle)
+    implementation(libs.camerax.view)
+
+    // Security & OkHttp
+    implementation(libs.security.crypto)
+    implementation(libs.okhttp)
+
     testImplementation(libs.junit)
     debugImplementation(libs.androidx.ui.tooling)
 }

@@ -21,6 +21,15 @@ class RavexPreferences(context: Context) {
         private const val KEY_GAME_MODE = "game_mode" // BALANCED, PERFORMANCE, ULTRA
         private const val KEY_GAME_PROFILES_JSON = "game_profiles_json"
         private const val KEY_CUSTOM_PRESETS_JSON = "custom_presets_json"
+
+        // AI Provider Settings
+        private const val KEY_DEFAULT_PROVIDER = "default_ai_provider"
+        private const val KEY_DEFAULT_MODEL = "default_ai_model"
+        private const val KEY_FALLBACK_ENABLED = "fallback_enabled"
+        private const val KEY_FALLBACK_PROVIDER = "fallback_provider"
+        private const val KEY_HUD_ACCENT_COLOR = "hud_accent_color"
+        private const val KEY_HUD_OPACITY = "hud_opacity"
+        private const val KEY_HUD_SIZE = "hud_size"
     }
 
     var activeCrosshairId: String
@@ -46,6 +55,58 @@ class RavexPreferences(context: Context) {
     var gameMode: String
         get() = prefs.getString(KEY_GAME_MODE, "PERFORMANCE") ?: "PERFORMANCE"
         set(value) = prefs.edit().putString(KEY_GAME_MODE, value).apply()
+
+    var defaultProvider: String
+        get() = prefs.getString(KEY_DEFAULT_PROVIDER, "groq") ?: "groq"
+        set(value) = prefs.edit().putString(KEY_DEFAULT_PROVIDER, value).apply()
+
+    var defaultModel: String
+        get() = prefs.getString(KEY_DEFAULT_MODEL, "llama3-70b-8192") ?: "llama3-70b-8192"
+        set(value) = prefs.edit().putString(KEY_DEFAULT_MODEL, value).apply()
+
+    var isFallbackEnabled: Boolean
+        get() = prefs.getBoolean(KEY_FALLBACK_ENABLED, true)
+        set(value) = prefs.edit().putBoolean(KEY_FALLBACK_ENABLED, value).apply()
+
+    var fallbackProvider: String
+        get() = prefs.getString(KEY_FALLBACK_PROVIDER, "openrouter") ?: "openrouter"
+        set(value) = prefs.edit().putString(KEY_FALLBACK_PROVIDER, value).apply()
+
+    var hudAccentColorHex: String
+        get() = prefs.getString(KEY_HUD_ACCENT_COLOR, "#00E5FF") ?: "#00E5FF"
+        set(value) = prefs.edit().putString(KEY_HUD_ACCENT_COLOR, value).apply()
+
+    var hudOpacityFloat: Float
+        get() = prefs.getFloat(KEY_HUD_OPACITY, 0.95f)
+        set(value) = prefs.edit().putFloat(KEY_HUD_OPACITY, value).apply()
+
+    var hudSizeScale: Float
+        get() = prefs.getFloat(KEY_HUD_SIZE, 1.0f)
+        set(value) = prefs.edit().putFloat(KEY_HUD_SIZE, value).apply()
+
+    fun getFeatureProvider(featureKey: String): String {
+        return prefs.getString("feat_prov_$featureKey", defaultProvider) ?: defaultProvider
+    }
+
+    fun setFeatureProvider(featureKey: String, providerId: String) {
+        prefs.edit().putString("feat_prov_$featureKey", providerId).apply()
+    }
+
+    fun getFeatureModel(featureKey: String): String {
+        return prefs.getString("feat_mod_$featureKey", "") ?: ""
+    }
+
+    fun setFeatureModel(featureKey: String, modelId: String) {
+        prefs.edit().putString("feat_mod_$featureKey", modelId).apply()
+    }
+
+    fun saveCachedModels(providerId: String, jsonModels: String) {
+        prefs.edit().putString("cached_models_$providerId", jsonModels).apply()
+    }
+
+    fun getCachedModels(providerId: String): String {
+        return prefs.getString("cached_models_$providerId", "") ?: ""
+    }
 
     fun getGameProfiles(): Map<String, GameProfile> {
         val jsonStr = prefs.getString(KEY_GAME_PROFILES_JSON, null) ?: return emptyMap()
