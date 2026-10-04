@@ -12,7 +12,9 @@ import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.lazy.rememberLazyListState
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material.icons.filled.Send
@@ -140,7 +142,7 @@ fun RavexCopilotScreen(
 
         Spacer(modifier = Modifier.height(8.dp))
 
-        // Message List
+        // Message List with Vertical Touch Scrolling
         LazyColumn(
             state = listState,
             modifier = Modifier

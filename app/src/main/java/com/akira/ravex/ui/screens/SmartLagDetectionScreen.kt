@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material.icons.filled.Warning
@@ -70,6 +72,7 @@ fun SmartLagDetectionScreen(ravexPrefs: RavexPreferences) {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         // Top Header
         Row(
@@ -142,7 +145,7 @@ fun SmartLagDetectionScreen(ravexPrefs: RavexPreferences) {
             border = BorderStroke(1.dp, RavexCyan.copy(alpha = 0.5f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .heightIn(min = 180.dp),
             shape = RoundedCornerShape(8.dp)
         ) {
             Column(modifier = Modifier.padding(12.dp)) {
@@ -154,23 +157,19 @@ fun SmartLagDetectionScreen(ravexPrefs: RavexPreferences) {
 
                 Spacer(modifier = Modifier.height(8.dp))
 
-                LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                    item {
-                        if (isAnalyzing) {
-                            Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
-                                CircularProgressIndicator(modifier = Modifier.size(16.dp), color = RavexCyan, strokeWidth = 2.dp)
-                                Spacer(modifier = Modifier.width(8.dp))
-                                Text("Analyzing system telemetry evidence...", color = RavexTextMuted, fontSize = 11.sp)
-                            }
-                        } else {
-                            Text(
-                                text = aiAnalysisResult ?: "Diagnostic ready. Click refresh to perform lag analysis.",
-                                color = Color.White,
-                                fontSize = 11.sp,
-                                lineHeight = 16.sp
-                            )
-                        }
+                if (isAnalyzing) {
+                    Row(verticalAlignment = Alignment.CenterVertically, modifier = Modifier.padding(10.dp)) {
+                        CircularProgressIndicator(modifier = Modifier.size(16.dp), color = RavexCyan, strokeWidth = 2.dp)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text("Analyzing system telemetry evidence...", color = RavexTextMuted, fontSize = 11.sp)
                     }
+                } else {
+                    Text(
+                        text = aiAnalysisResult ?: "Diagnostic ready. Click refresh to perform lag analysis.",
+                        color = Color.White,
+                        fontSize = 11.sp,
+                        lineHeight = 16.sp
+                    )
                 }
             }
         }

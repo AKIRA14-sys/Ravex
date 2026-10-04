@@ -10,11 +10,11 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
-import androidx.compose.material.icons.filled.Delete
-import androidx.compose.material.icons.filled.Edit
 import androidx.compose.material.icons.filled.Share
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
@@ -25,18 +25,15 @@ import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
-import com.akira.ravex.data.CrosshairPresetsRepository
 import com.akira.ravex.data.RavexPreferences
 import com.akira.ravex.model.GameProfile
 import com.akira.ravex.ui.theme.*
 import com.akira.ravex.util.SystemMonitorUtil
 import com.google.gson.Gson
-import kotlinx.coroutines.launch
 
 @Composable
 fun GameProfilesScreen(ravexPrefs: RavexPreferences) {
     val context = LocalContext.current
-    val scope = rememberCoroutineScope()
     val gson = Gson()
 
     var profilesMap by remember { mutableStateOf(ravexPrefs.getGameProfiles()) }
@@ -67,6 +64,7 @@ fun GameProfilesScreen(ravexPrefs: RavexPreferences) {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text("RAVEX SMART GAME PROFILES", color = RavexCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("Per-game graphics preferences, sensitivity notes, crosshair mapping, and custom layout profiles.", color = RavexTextMuted, fontSize = 10.sp)
@@ -76,7 +74,7 @@ fun GameProfilesScreen(ravexPrefs: RavexPreferences) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .heightIn(min = 220.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Profile Selector Sidebar
@@ -92,8 +90,8 @@ fun GameProfilesScreen(ravexPrefs: RavexPreferences) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(profilesMap.values.toList()) { profile ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        profilesMap.values.forEach { profile ->
                             val isSelected = profile.packageName == selectedPackageName
                             Box(
                                 modifier = Modifier

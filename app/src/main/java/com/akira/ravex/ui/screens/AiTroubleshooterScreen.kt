@@ -8,7 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -74,6 +76,7 @@ fun AiTroubleshooterScreen(ravexPrefs: RavexPreferences) {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text("RAVEX AI TROUBLESHOOTER", color = RavexCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("Interactive diagnosis for floating overlay, performance, crash, network, and permission issues.", color = RavexTextMuted, fontSize = 10.sp)
@@ -83,7 +86,7 @@ fun AiTroubleshooterScreen(ravexPrefs: RavexPreferences) {
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .heightIn(min = 220.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Problem Selector Sidebar
@@ -99,8 +102,8 @@ fun AiTroubleshooterScreen(ravexPrefs: RavexPreferences) {
 
                     Spacer(modifier = Modifier.height(6.dp))
 
-                    LazyColumn(modifier = Modifier.weight(1f)) {
-                        items(commonIssues) { issue ->
+                    Column(modifier = Modifier.fillMaxWidth()) {
+                        commonIssues.forEach { issue ->
                             val isSelected = issue == selectedIssue
                             Box(
                                 modifier = Modifier
@@ -171,16 +174,12 @@ fun AiTroubleshooterScreen(ravexPrefs: RavexPreferences) {
                             Text("Running system diagnostics & compiling safe resolution steps...", color = RavexTextMuted, fontSize = 10.sp)
                         }
                     } else {
-                        LazyColumn(modifier = Modifier.weight(1f)) {
-                            item {
-                                Text(
-                                    text = diagnosisSteps ?: "Select an issue to view step-by-step resolution steps.",
-                                    color = Color.White,
-                                    fontSize = 10.5.sp,
-                                    lineHeight = 16.sp
-                                )
-                            }
-                        }
+                        Text(
+                            text = diagnosisSteps ?: "Select an issue to view step-by-step resolution steps.",
+                            color = Color.White,
+                            fontSize = 10.5.sp,
+                            lineHeight = 16.sp
+                        )
                     }
                 }
             }
