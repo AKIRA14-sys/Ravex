@@ -18,7 +18,9 @@ import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -75,6 +77,7 @@ fun AiCameraScreen(ravexPrefs: RavexPreferences) {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text("RAVEX AI CAMERA — GAMING SETUP ASSISTANT", color = RavexCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("Analyze physical gaming desk, monitor setup, posture, or photographed graphics settings page.", color = RavexTextMuted, fontSize = 10.sp)
@@ -84,7 +87,8 @@ fun AiCameraScreen(ravexPrefs: RavexPreferences) {
         if (!hasCameraPermission) {
             Box(
                 modifier = Modifier
-                    .fillMaxSize()
+                    .fillMaxWidth()
+                    .height(200.dp)
                     .background(RavexSurface, RoundedCornerShape(8.dp)),
                 contentAlignment = Alignment.Center
             ) {
@@ -99,7 +103,7 @@ fun AiCameraScreen(ravexPrefs: RavexPreferences) {
             Row(
                 modifier = Modifier
                     .fillMaxWidth()
-                    .weight(1f),
+                    .heightIn(min = 220.dp),
                 horizontalArrangement = Arrangement.spacedBy(8.dp)
             ) {
                 // Camera Preview / Captured Photo Container
@@ -263,16 +267,12 @@ fun AiCameraScreen(ravexPrefs: RavexPreferences) {
 
                         Spacer(modifier = Modifier.height(8.dp))
 
-                        LazyColumn(modifier = Modifier.weight(1f)) {
-                            item {
-                                Text(
-                                    text = analysisResult ?: "Capture a photo and enable consent to receive AI vision feedback.",
-                                    color = Color.White,
-                                    fontSize = 10.sp,
-                                    lineHeight = 15.sp
-                                )
-                            }
-                        }
+                        Text(
+                            text = analysisResult ?: "Capture a photo and enable consent to receive AI vision feedback.",
+                            color = Color.White,
+                            fontSize = 10.sp,
+                            lineHeight = 15.sp
+                        )
                     }
                 }
             }

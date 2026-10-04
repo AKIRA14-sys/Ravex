@@ -19,8 +19,10 @@ import androidx.compose.foundation.gestures.detectDragGestures
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Close
 import androidx.compose.material3.*
@@ -241,13 +243,13 @@ class RavexOverlayService : Service() {
                                 )
                             }
                         } else {
-                            // Expanded Floating Gaming Panel
+                            // Expanded Floating Gaming Panel with Vertical Swiping & Scrolling
                             Card(
                                 colors = CardDefaults.cardColors(containerColor = RavexSurface.copy(alpha = ravexPrefs.hudOpacityFloat)),
                                 border = androidx.compose.foundation.BorderStroke(1.dp, RavexCyan),
                                 modifier = Modifier
-                                    .width(360.dp)
-                                    .height(260.dp),
+                                    .width(420.dp)
+                                    .height(300.dp),
                                 shape = RoundedCornerShape(12.dp)
                             ) {
                                 Column(modifier = Modifier.padding(8.dp)) {
@@ -301,11 +303,12 @@ class RavexOverlayService : Service() {
 
                                     Spacer(modifier = Modifier.height(6.dp))
 
-                                    // Active Panel Content
+                                    // Vertically Scrollable Content Panel Container inside HUD bubble
                                     Box(
                                         modifier = Modifier
                                             .fillMaxWidth()
                                             .weight(1f)
+                                            .verticalScroll(rememberScrollState())
                                     ) {
                                         when (activeTab) {
                                             HudTabModule.COPILOT -> RavexCopilotScreen(ravexPrefs = ravexPrefs)

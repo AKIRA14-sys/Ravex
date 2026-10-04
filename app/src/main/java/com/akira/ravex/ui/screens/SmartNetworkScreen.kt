@@ -6,7 +6,9 @@ import androidx.compose.foundation.BorderStroke
 import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Refresh
 import androidx.compose.material3.*
@@ -102,6 +104,7 @@ fun SmartNetworkScreen() {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Row(
             modifier = Modifier.fillMaxWidth(),
@@ -166,7 +169,7 @@ fun SmartNetworkScreen() {
             border = BorderStroke(1.dp, RavexCyan.copy(alpha = 0.4f)),
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .heightIn(min = 180.dp),
             shape = RoundedCornerShape(8.dp)
         ) {
             Column(modifier = Modifier.padding(10.dp)) {
@@ -181,16 +184,12 @@ fun SmartNetworkScreen() {
                         Text("Sending latency probes & measuring jitter...", color = RavexTextMuted, fontSize = 10.sp)
                     }
                 } else {
-                    LazyColumn(modifier = Modifier.fillMaxWidth()) {
-                        item {
-                            Text(
-                                text = aiNetworkExplanation ?: "Network test ready.",
-                                color = Color.White,
-                                fontSize = 10.5.sp,
-                                lineHeight = 15.sp
-                            )
-                        }
-                    }
+                    Text(
+                        text = aiNetworkExplanation ?: "Network test ready.",
+                        color = Color.White,
+                        fontSize = 10.5.sp,
+                        lineHeight = 15.sp
+                    )
                 }
             }
         }

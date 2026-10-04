@@ -5,7 +5,9 @@ import androidx.compose.foundation.background
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -67,6 +69,7 @@ fun SessionCoachScreen(
             .fillMaxSize()
             .background(RavexBlack)
             .padding(10.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         Text("RAVEX GAMING SESSION COACH", color = RavexCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
         Text("Track gaming sessions, receive hydration/break reminders, and get AI post-match coaching summaries.", color = RavexTextMuted, fontSize = 10.sp)
@@ -76,7 +79,7 @@ fun SessionCoachScreen(
         Row(
             modifier = Modifier
                 .fillMaxWidth()
-                .weight(1f),
+                .heightIn(min = 220.dp),
             horizontalArrangement = Arrangement.spacedBy(8.dp)
         ) {
             // Live Session Control Panel
@@ -199,13 +202,11 @@ fun SessionCoachScreen(
                     Spacer(modifier = Modifier.height(10.dp))
 
                     Text("SESSION HISTORY", color = RavexGold, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-                    LazyColumn(modifier = Modifier.weight(1f)) {
+                    Column(modifier = Modifier.fillMaxWidth()) {
                         if (sessionHistory.isEmpty()) {
-                            item {
-                                Text("No recorded sessions yet.", color = RavexTextMuted, fontSize = 10.sp, modifier = Modifier.padding(vertical = 4.dp))
-                            }
+                            Text("No recorded sessions yet.", color = RavexTextMuted, fontSize = 10.sp, modifier = Modifier.padding(vertical = 4.dp))
                         } else {
-                            items(sessionHistory) { item ->
+                            sessionHistory.forEach { item ->
                                 Row(
                                     modifier = Modifier
                                         .fillMaxWidth()

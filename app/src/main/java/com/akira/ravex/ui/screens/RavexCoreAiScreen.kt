@@ -8,7 +8,9 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Check
 import androidx.compose.material.icons.filled.Refresh
@@ -58,6 +60,7 @@ fun RavexCoreAiScreen(ravexPrefs: RavexPreferences) {
             .fillMaxSize()
             .background(RavexBlack)
             .padding(12.dp)
+            .verticalScroll(rememberScrollState())
     ) {
         // Header
         Text(
@@ -279,25 +282,19 @@ fun RavexCoreAiScreen(ravexPrefs: RavexPreferences) {
 
         Spacer(modifier = Modifier.height(6.dp))
 
-        // Model List
+        // Model List Items
         val filteredModels = discoveredModels.filter { it.name.contains(searchQuery, ignoreCase = true) || it.id.contains(searchQuery, ignoreCase = true) }
 
-        LazyColumn(
-            modifier = Modifier
-                .fillMaxWidth()
-                .weight(1f)
-        ) {
+        Column(modifier = Modifier.fillMaxWidth()) {
             if (filteredModels.isEmpty()) {
-                item {
-                    Text(
-                        text = if (isDiscovering) "Discovering real provider models..." else "No models cached or retrieved. Enter key and tap refresh icon.",
-                        color = RavexTextMuted,
-                        fontSize = 11.sp,
-                        modifier = Modifier.padding(12.dp)
-                    )
-                }
+                Text(
+                    text = if (isDiscovering) "Discovering real provider models..." else "No models cached or retrieved. Enter key and tap refresh icon.",
+                    color = RavexTextMuted,
+                    fontSize = 11.sp,
+                    modifier = Modifier.padding(12.dp)
+                )
             } else {
-                items(filteredModels) { model ->
+                filteredModels.forEach { model ->
                     val isDefault = ravexPrefs.defaultModel == model.id
                     Card(
                         colors = CardDefaults.cardColors(containerColor = if (isDefault) RavexSurfaceVariant else RavexSurface),

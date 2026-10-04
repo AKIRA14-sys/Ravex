@@ -15,8 +15,10 @@ import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.foundation.verticalScroll
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -154,7 +156,8 @@ fun AiVoiceCommandsScreen(
         modifier = Modifier
             .fillMaxSize()
             .background(RavexBlack)
-            .padding(10.dp),
+            .padding(10.dp)
+            .verticalScroll(rememberScrollState()),
         horizontalAlignment = Alignment.CenterHorizontally
     ) {
         Text("RAVEX AI VOICE COMMANDS", color = RavexCyan, fontSize = 16.sp, fontWeight = FontWeight.Bold)
@@ -242,8 +245,8 @@ fun AiVoiceCommandsScreen(
 
         // Sample Commands Guidance
         Text("SAMPLE VOICE COMMANDS", color = RavexCyan, fontSize = 11.sp, fontWeight = FontWeight.Bold)
-        LazyColumn(modifier = Modifier.weight(1f)) {
-            items(sampleCommands) { cmd ->
+        Column(modifier = Modifier.fillMaxWidth()) {
+            sampleCommands.forEach { cmd ->
                 Text(
                     text = "• $cmd",
                     color = RavexTextMuted,
